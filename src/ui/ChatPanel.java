@@ -6,27 +6,36 @@ import java.io.File;
 
 public class ChatPanel extends JPanel {
 
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel cards = new JPanel(cardLayout);
+
+    // Chat UI components
     private final JTextArea chatArea = new JTextArea();
     private final JTextField inputField = new JTextField();
     private final JButton uploadBtn = new JButton("Upload");
     private final JButton sendBtn = new JButton("Submit");
 
     public ChatPanel() {
-        setLayout(new BorderLayout(10, 10));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        setLayout(new BorderLayout());
 
-        // Header tabs (dummy)
+        // --- Chat page ---
+        JPanel chatPage = new JPanel(new BorderLayout(10, 10));
+        chatPage.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        // Header tabs
         JPanel header = new JPanel(new FlowLayout(FlowLayout.CENTER, 16, 8));
-        header.add(createFakeTab("Typing Practice"));
-        header.add(createFakeTab("Flash cards"));
-        add(header, BorderLayout.NORTH);
+        JButton typingBtn = createFakeTab("Typing Practice");
+        JButton flashBtn = createFakeTab("Flash cards");
+        header.add(typingBtn);
+        header.add(flashBtn);
+        chatPage.add(header, BorderLayout.NORTH);
 
         // Chat area
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
         chatArea.setText("welcome! This is your StudyMate, Type any thing to start.\n");
-        add(new JScrollPane(chatArea), BorderLayout.CENTER);
+        chatPage.add(new JScrollPane(chatArea), BorderLayout.CENTER);
 
         // Input area
         JPanel bottom = new JPanel(new BorderLayout(8, 8));
@@ -37,12 +46,27 @@ public class ChatPanel extends JPanel {
         buttons.add(sendBtn);
         bottom.add(buttons, BorderLayout.EAST);
 
-        add(bottom, BorderLayout.SOUTH);
+        chatPage.add(bottom, BorderLayout.SOUTH);
 
         // Actions
         sendBtn.addActionListener(e -> sendMessage());
         inputField.addActionListener(e -> sendMessage());
         uploadBtn.addActionListener(e -> openFileChooser());
+
+        // --- Typing Practice page ---
+        TypingPracticePanel typingPage = new TypingPracticePanel(() -> cardLayout.show(cards, "chat"));
+
+        // Add both pages to cards
+        cards.add(chatPage, "chat");
+        cards.add(typingPage, "typing");
+
+        add(cards, BorderLayout.CENTER);
+
+        // Default to chat
+        cardLayout.show(cards, "chat");
+
+        // Switch to typing practice
+        typingBtn.addActionListener(e -> cardLayout.show(cards, "typing"));
     }
 
     private JButton createFakeTab(String text) {
