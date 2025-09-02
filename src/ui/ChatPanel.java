@@ -34,7 +34,7 @@ public class ChatPanel extends JPanel {
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
-        chatArea.setText("welcome! This is your StudyMate, Type any thing to start.\n");
+        chatArea.setText("Welcome! This is your StudyMate, Type any thing to start.\n");
         chatPage.add(new JScrollPane(chatArea), BorderLayout.CENTER);
 
         // Input area
