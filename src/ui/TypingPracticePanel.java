@@ -5,7 +5,7 @@ import java.awt.*;
 
 public class TypingPracticePanel extends JPanel {
 
-    public TypingPracticePanel(Runnable goBack) {
+    public TypingPracticePanel(Runnable onPractice, Runnable onRace, Runnable onBack) {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
@@ -24,11 +24,9 @@ public class TypingPracticePanel extends JPanel {
 
         add(buttons, BorderLayout.CENTER);
 
-        // Actions (for now they just show placeholder dialogs)
-        practiceBtn.addActionListener(e -> JOptionPane.showMessageDialog(this, "Practice mode coming soon!"));
-        raceBtn.addActionListener(e -> JOptionPane.showMessageDialog(this, "Race mode coming soon!"));
-
-        // Allow returning to chat page
-        backBtn.addActionListener(e -> goBack.run());
+        // Actions (delegate to ChatPanel)
+        practiceBtn.addActionListener(e -> onPractice.run());
+        raceBtn.addActionListener(e -> onRace.run());
+        backBtn.addActionListener(e -> onBack.run());
     }
 }

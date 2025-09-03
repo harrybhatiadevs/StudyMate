@@ -53,20 +53,30 @@ public class ChatPanel extends JPanel {
         inputField.addActionListener(e -> sendMessage());
         uploadBtn.addActionListener(e -> openFileChooser());
 
-        // --- Typing Practice page ---
-        TypingPracticePanel typingPage = new TypingPracticePanel(() -> cardLayout.show(cards, "chat"));
+        // --- Typing Practice menu ---
+        TypingPracticePanel typingMenu = new TypingPracticePanel(
+                () -> cardLayout.show(cards, "typingExercise"),  // onPractice
+                () -> JOptionPane.showMessageDialog(this, "Race mode coming soon!"), // onRace
+                () -> cardLayout.show(cards, "chat")             // onBack
+        );
 
-        // Add both pages to cards
+        // --- Typing Exercise ---
+        TypingExercisePanel typingExercise = new TypingExercisePanel(
+                () -> cardLayout.show(cards, "typingMenu")
+        );
+
+        // Add all pages to cards
         cards.add(chatPage, "chat");
-        cards.add(typingPage, "typing");
+        cards.add(typingMenu, "typingMenu");
+        cards.add(typingExercise, "typingExercise");
 
         add(cards, BorderLayout.CENTER);
 
         // Default to chat
         cardLayout.show(cards, "chat");
 
-        // Switch to typing practice
-        typingBtn.addActionListener(e -> cardLayout.show(cards, "typing"));
+        // Switch to typing practice menu when tab is clicked
+        typingBtn.addActionListener(e -> cardLayout.show(cards, "typingMenu"));
     }
 
     private JButton createFakeTab(String text) {
