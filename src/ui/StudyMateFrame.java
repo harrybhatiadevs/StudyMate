@@ -6,6 +6,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import ui.FlashcardsPanel;
+import model.Flashcard;
+import model.FlashcardDAO;
 
 public class StudyMateFrame extends JFrame {
 
@@ -13,7 +16,8 @@ public class StudyMateFrame extends JFrame {
     private final ChatPanel chatPanel = new ChatPanel();
     private final ProjectsPanel projectsPanel = new ProjectsPanel();
     private final TemplatesPanel templatesPanel = new TemplatesPanel();
-    private final OtherPagesPanel otherPagesPanel = new OtherPagesPanel();
+private final OtherPagesPanel otherPagesPanel = new OtherPagesPanel();
+private final FlashcardsPanel flashcardsPanel = new FlashcardsPanel();
 
     private final Sidebar sidebar;
 
@@ -30,13 +34,19 @@ public class StudyMateFrame extends JFrame {
         sidebar = new Sidebar();
         add(sidebar, BorderLayout.WEST);
 
-        // Main area with cards
+        // com.studymate.Main area with cards
         mainCards.add(chatPanel, "CHAT");
         mainCards.add(projectsPanel, "PROJECTS");
         mainCards.add(templatesPanel, "TEMPLATES");
         mainCards.add(otherPagesPanel, "OTHER");
+        mainCards.add(flashcardsPanel, "FLASHCARDS");
 
         add(mainCards, BorderLayout.CENTER);
+
+        chatPanel.onFlashcards(() -> {
+            flashcardsPanel.refresh();
+            showCard("FLASHCARDS");
+        });
 
         // Wire sidebar navigation
         sidebar.onNewProject(() -> {

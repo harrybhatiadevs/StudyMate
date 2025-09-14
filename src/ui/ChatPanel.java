@@ -15,6 +15,9 @@ public class ChatPanel extends JPanel {
     private final JButton uploadBtn = new JButton("Upload");
     private final JButton sendBtn = new JButton("Submit");
 
+    private JButton flashTab;                 // header tab for Flash cards
+    private Runnable onFlashcardsAction;      // callback hook set by the frame
+
     public ChatPanel() {
         setLayout(new BorderLayout());
 
@@ -25,9 +28,9 @@ public class ChatPanel extends JPanel {
         // Header tabs
         JPanel header = new JPanel(new FlowLayout(FlowLayout.CENTER, 16, 8));
         JButton typingBtn = createFakeTab("Typing Practice");
-        JButton flashBtn = createFakeTab("Flash cards");
+        flashTab = createFakeTab("Flash cards");
         header.add(typingBtn);
-        header.add(flashBtn);
+        header.add(flashTab);
         chatPage.add(header, BorderLayout.NORTH);
 
         // Chat area
@@ -77,6 +80,10 @@ public class ChatPanel extends JPanel {
 
         // Switch to typing practice menu when tab is clicked
         typingBtn.addActionListener(e -> cardLayout.show(cards, "typingMenu"));
+        // Delegate Flash cards tab click to the frame via the hook
+        flashTab.addActionListener(e -> {
+            if (onFlashcardsAction != null) onFlashcardsAction.run();
+        });
     }
 
     private JButton createFakeTab(String text) {
@@ -110,4 +117,9 @@ public class ChatPanel extends JPanel {
     public void requestFocusOnInput() {
         inputField.requestFocusInWindow();
     }
+
+    public void onFlashcards(Runnable action) {
+        this.onFlashcardsAction = action;
+    }
 }
+

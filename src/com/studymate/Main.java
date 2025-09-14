@@ -1,3 +1,5 @@
+package com.studymate;
+
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
