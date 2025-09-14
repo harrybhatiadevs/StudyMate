@@ -15,6 +15,12 @@ public class ChatPanel extends JPanel {
     private final JButton uploadBtn = new JButton("Upload");
     private final JButton sendBtn = new JButton("Submit");
 
+    // Profile for the current user
+    private final Profile currentUserProfile = new Profile("Jayden"); // adjust name dynamically if needed
+
+    // TextLibrary instance
+    private final TextLibrary textLibrary = new TextLibrary();
+
     public ChatPanel() {
         setLayout(new BorderLayout());
 
@@ -55,14 +61,16 @@ public class ChatPanel extends JPanel {
 
         // --- Typing Practice menu ---
         TypingPracticePanel typingMenu = new TypingPracticePanel(
-                () -> cardLayout.show(cards, "typingExercise"),  // onPractice
+                () -> cardLayout.show(cards, "typingExercise"),          // onPractice
                 () -> JOptionPane.showMessageDialog(this, "Race mode coming soon!"), // onRace
-                () -> cardLayout.show(cards, "chat")             // onBack
+                () -> cardLayout.show(cards, "chat")                     // onBack
         );
 
         // --- Typing Exercise ---
         TypingExercisePanel typingExercise = new TypingExercisePanel(
-                () -> cardLayout.show(cards, "typingMenu")
+                () -> cardLayout.show(cards, "typingMenu"), // goBack
+                currentUserProfile,                         // profile object
+                textLibrary                                 // text library
         );
 
         // Add all pages to cards
