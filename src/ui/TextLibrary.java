@@ -2,19 +2,13 @@ package ui;
 
 public class TextLibrary {
 
-    // Add sentences or paragraphs here. Multi-line texts can use Java text blocks (Java 15+)
     private static final String[] TEXTS = {
             "The quick brown fox jumps over the lazy dog.",
             "A journey of a thousand miles begins with a single step.",
-            "Practice makes perfect. Keep pushing forward, even when it’s tough.",
-            """
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
-        Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-        """,
-            """
-        It was the best of times, it was the worst of times, 
-        it was the age of wisdom, it was the age of foolishness...
-        """
+            "Practice makes perfect. Keep pushing forward, even when it's tough.",
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness...",
+            "Life is a storm, my young friend. You will bask in the sunlight one moment, be shattered on the rocks the next. What makes you a man is what you do when that storm comes. You must look into that storm and shout as you did in Rome. Do your worst, for I will do mine! Then the fates will know you as we know you."
     };
 
     /**

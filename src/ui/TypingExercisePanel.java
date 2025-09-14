@@ -115,9 +115,12 @@ public class TypingExercisePanel extends JPanel {
                 int wordsTyped = typed.length() / 5;
                 int wpm = (int) (wordsTyped / Math.max(elapsedMinutes, 0.01));
 
-                // Completion check
-                boolean complete = typed.length() >= targetText.length();
-                boolean fullyCorrect = typed.equals(targetText);
+                // ✅ Completion check (sanitize both sides before comparison)
+                String normalizedTarget = sanitizeText(targetText);
+                String normalizedTyped = sanitizeText(typed);
+
+                boolean complete = normalizedTyped.length() == normalizedTarget.length();
+                boolean fullyCorrect = normalizedTyped.equals(normalizedTarget);
 
                 if (complete && fullyCorrect) {
                     statusLabel.setText("✅ Correct! WPM: " + wpm +
@@ -169,12 +172,14 @@ public class TypingExercisePanel extends JPanel {
         }
     }
 
-    /** Replace curly quotes/apostrophes and ellipses with straight equivalents */
+    /** Replace curly quotes/apostrophes, ellipses, and normalize whitespace */
     private String sanitizeText(String s) {
         return s.replace("…", "...")
                 .replace("’", "'")
                 .replace("‘", "'")
                 .replace("“", "\"")
-                .replace("”", "\"");
+                .replace("”", "\"")
+                .replaceAll("\\s+", " ")   // collapse multiple spaces/newlines into one space
+                .trim();                   // remove leading/trailing spaces/newlines
+        }
     }
-}
