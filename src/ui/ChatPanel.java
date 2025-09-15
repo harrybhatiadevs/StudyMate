@@ -93,6 +93,8 @@ public class ChatPanel extends JPanel {
         return b;
     }
 
+    private GeminiClient aiClient = new GeminiClient(System.getenv("GOOGLE_API_KEY"));
+
     private void sendMessage() {
         String text = inputField.getText().trim();
         if (text.isEmpty()) return;
