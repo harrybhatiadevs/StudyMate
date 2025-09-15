@@ -3,6 +3,7 @@ package ui;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 
 public class ChatPanel extends JPanel {
 
@@ -96,11 +97,18 @@ public class ChatPanel extends JPanel {
     private GeminiClient aiClient = new GeminiClient(System.getenv("GOOGLE_API_KEY"));
 
     private void sendMessage() {
-        String text = inputField.getText().trim();
-        if (text.isEmpty()) return;
-        chatArea.append("\nYou: " + text + "\n");
-        chatArea.append("StudyMate: Thanks! This is a placeholder response. (AI not connected yet.)\n");
+        String userMessage = inputField.getText().trim();
+        if (userMessage.isEmpty()) return;
+
+        // show user message in chat
+        chatArea.append("You: " + userMessage + "\n");
         inputField.setText("");
+
+        // call GeminiClient on a background thread
+        new Thread(() -> {
+            String reply = aiClient.askGemini(userMessage);
+            SwingUtilities.invokeLater(() -> chatArea.append("AI: " + reply + "\n"));
+        }).start();
     }
 
     private void openFileChooser() {
