@@ -1,4 +1,4 @@
-package ui;
+package com.ui;
 
 public class Profile {
     private final String username;

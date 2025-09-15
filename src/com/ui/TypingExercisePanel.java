@@ -1,11 +1,10 @@
-package ui;
+package com.ui;
 
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import ui.TextLibrary;
 
 public class TypingExercisePanel extends JPanel {
 

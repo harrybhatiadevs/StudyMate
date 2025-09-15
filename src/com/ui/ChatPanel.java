@@ -1,9 +1,17 @@
-package ui;
+package com.ui;
+
+import com.auth.Session;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 
+/**
+ * ChatPanel
+ * - Chat-like UI with an upload button (placeholder).
+ * - Integrates TypingPractice menu and TypingExercise page.
+ * - Builds a com.ui.Profile from Session username (or Guest) when opening exercise.
+ */
 public class ChatPanel extends JPanel {
 
     private final CardLayout cardLayout = new CardLayout();
@@ -15,10 +23,11 @@ public class ChatPanel extends JPanel {
     private final JButton uploadBtn = new JButton("Upload");
     private final JButton sendBtn = new JButton("Submit");
 
-    // Profile for the current user
-    private final Profile currentUserProfile = new Profile("Jayden"); // adjust name dynamically if needed
+    // Panels
+    private TypingPracticePanel typingMenu;       // created once
+    private TypingExercisePanel typingExercise;   // re-created when starting a new exercise
 
-    // TextLibrary instance
+    // TextLibrary instance (assumed to exist in your project)
     private final TextLibrary textLibrary = new TextLibrary();
 
     public ChatPanel() {
@@ -60,30 +69,20 @@ public class ChatPanel extends JPanel {
         uploadBtn.addActionListener(e -> openFileChooser());
 
         // --- Typing Practice menu ---
-        TypingPracticePanel typingMenu = new TypingPracticePanel(
-                () -> cardLayout.show(cards, "typingExercise"),          // onPractice
+        typingMenu = new TypingPracticePanel(
+                this::openTypingExercise,                                   // onPractice
                 () -> JOptionPane.showMessageDialog(this, "Race mode coming soon!"), // onRace
-                () -> cardLayout.show(cards, "chat")                     // onBack
+                () -> cardLayout.show(cards, "chat")                        // onBack
         );
 
-        // --- Typing Exercise ---
-        TypingExercisePanel typingExercise = new TypingExercisePanel(
-                () -> cardLayout.show(cards, "typingMenu"), // goBack
-                currentUserProfile,                         // profile object
-                textLibrary                                 // text library
-        );
-
-        // Add all pages to cards
+        // Add pages
         cards.add(chatPage, "chat");
         cards.add(typingMenu, "typingMenu");
-        cards.add(typingExercise, "typingExercise");
-
         add(cards, BorderLayout.CENTER);
 
-        // Default to chat
+        // Default
         cardLayout.show(cards, "chat");
 
-        // Switch to typing practice menu when tab is clicked
         typingBtn.addActionListener(e -> cardLayout.show(cards, "typingMenu"));
     }
 
@@ -117,5 +116,35 @@ public class ChatPanel extends JPanel {
 
     public void requestFocusOnInput() {
         inputField.requestFocusInWindow();
+    }
+
+    /**
+     * Returns a com.ui.Profile built from Session (or a Guest fallback).
+     * TypingExercisePanel expects com.ui.Profile, so we keep that type here.
+     */
+    private Profile getCurrentUiProfile() {
+        String username = "Guest";
+        if (Session.isLoggedIn() && Session.getCurrentUser() != null) {
+            username = Session.getCurrentUser().getUsername();
+        }
+        return new Profile(username);
+    }
+
+    /**
+     * Opens the typing exercise card.
+     * Rebuilds TypingExercisePanel each time to pick up the latest user name.
+     */
+    private void openTypingExercise() {
+        if (typingExercise != null) {
+            cards.remove(typingExercise);
+        }
+
+        typingExercise = new TypingExercisePanel(
+                () -> cardLayout.show(cards, "typingMenu"), // goBack
+                getCurrentUiProfile(),                      // com.ui.Profile from Session
+                textLibrary
+        );
+        cards.add(typingExercise, "typingExercise");
+        cardLayout.show(cards, "typingExercise");
     }
 }

@@ -1,7 +1,7 @@
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-import ui.StudyMateFrame;
+import com.ui.StudyMateFrame;
 
 public class Main {
     public static void main(String[] args) {
