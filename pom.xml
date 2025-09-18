@@ -12,6 +12,7 @@
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        <javafx.version>21.0.4</javafx.version>
     </properties>
 
     <dependencies>
@@ -36,6 +37,39 @@
             <version>1.16.0</version>
         </dependency>
 
+        <!-- JavaFX Dependancy -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>ui.Main</mainClass>
+                    <launcher>StudyMate</launcher>
+                    <jlinkZipName>studymate</jlinkZipName>
+                    <stripManifest>true</stripManifest>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
