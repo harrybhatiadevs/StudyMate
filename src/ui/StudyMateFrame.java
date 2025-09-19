@@ -4,15 +4,16 @@ import model.Project;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
+import javafx.embed.swing.JFXPanel;
+import javafx.application.Platform;
+import javafx.scene.Scene;
 
 public class StudyMateFrame extends JFrame {
 
     private final JPanel mainCards = new JPanel(new CardLayout());
     private final ChatPanel chatPanel = new ChatPanel();
     private final ProjectsPanel projectsPanel = new ProjectsPanel();
-    private final TemplatesPanel templatesPanel = new TemplatesPanel();
+    private final JFXPanel templatesPanel = new JFXPanel();
     private final OtherPagesPanel otherPagesPanel = new OtherPagesPanel();
 
     private final Sidebar sidebar;
@@ -29,6 +30,12 @@ public class StudyMateFrame extends JFrame {
         // Left sidebar
         sidebar = new Sidebar();
         add(sidebar, BorderLayout.WEST);
+
+        // Initialize JavaFX content for the Flashcards page inside Swing
+        Platform.runLater(() -> {
+            ui.FlashcardsPanel fxPanel = new ui.FlashcardsPanel();
+            templatesPanel.setScene(new Scene(fxPanel));
+        });
 
         // Main area with cards
         mainCards.add(chatPanel, "CHAT");

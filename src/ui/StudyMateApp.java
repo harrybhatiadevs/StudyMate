@@ -3,70 +3,56 @@ package ui;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import ui.views.ChatView;
-import ui.views.OtherPagesView;
-import ui.views.ProjectsView;
-import ui.views.TemplatesView;
-import ui.views.TypingHomeView;
-import ui.views.TypingPracticeView;
-import ui.views.TypingExerciseView;
 
 public class StudyMateApp extends Application {
-
-    private BorderPane root;
-    private SidebarFX sidebar;
-
-    // Main sections
-    private final ChatView chatView = new ChatView();
-    private final ProjectsView projectsView = new ProjectsView();
-    private final TemplatesView templatesView = new TemplatesView();
-    private final OtherPagesView otherPagesView = new OtherPagesView();
-
-    // Typing module: home + 2 sub-views
-    private final TypingHomeView typingHomeView = new TypingHomeView();
-    private final TypingPracticeView typingPracticeView = new TypingPracticeView();
-    private final TypingExerciseView typingExerciseView = new TypingExerciseView();
-
     @Override
     public void start(Stage stage) {
-        root = new BorderPane();
-        root.setPadding(new Insets(8));
+        // Root layout
+        BorderPane root = new BorderPane();
 
-        // Wire Typing home -> sub-views
-        typingHomeView.setOnChoice(choice -> {
-            switch (choice) {
-                case PRACTICE -> setCenter(typingPracticeView);
-                case EXERCISE -> setCenter(typingExerciseView);
-            }
-        });
-        // Back handlers from sub-views to Typing home
-        typingPracticeView.setOnBack(() -> setCenter(typingHomeView));
-        typingExerciseView.setOnBack(() -> setCenter(typingHomeView));
+        // --- JavaFX sidebar ---
+        VBox sidebar = new VBox(8);
+        sidebar.setPadding(new Insets(12));
+        sidebar.setPrefWidth(180);
 
-        // Sidebar navigation
-        sidebar = new SidebarFX();
-        sidebar.setOnNavigate(target -> {
-            switch (target) {
-                case CHAT -> setCenter(chatView);
-                case PROJECTS -> setCenter(projectsView);
-                case TEMPLATES -> setCenter(templatesView);
-                case TYPING -> setCenter(typingHomeView); // land on Typing home
-                case OTHERS -> setCenter(otherPagesView);
-            }
-        });
+        Button chatBtn       = new Button("Chat");
+        Button projectsBtn   = new Button("Projects");
+        Button flashcardsBtn = new Button("Flashcards");
+        Button typingBtn     = new Button("Typing Practice");
+        Button othersBtn     = new Button("Other Pages");
+
+        for (Button b : new Button[]{chatBtn, projectsBtn, flashcardsBtn, typingBtn, othersBtn}) {
+            b.setMaxWidth(Double.MAX_VALUE);
+        }
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+        sidebar.getChildren().addAll(chatBtn, projectsBtn, flashcardsBtn, typingBtn, othersBtn, spacer);
 
         root.setLeft(sidebar);
-        setCenter(chatView); // default page
 
-        Scene scene = new Scene(root, 1100, 700);
+        // --- Center content actions (swap views) ---
+        chatBtn.setOnAction(e -> root.setCenter(new Label("Chat")));
+        projectsBtn.setOnAction(e -> root.setCenter(new Label("Projects")));
+        typingBtn.setOnAction(e -> root.setCenter(new Label("Typing Practice")));
+        othersBtn.setOnAction(e -> root.setCenter(new Label("Other Pages")));
+
+        // ✅ Flashcards (your JavaFX panel that talks to SQLite)
+        flashcardsBtn.setOnAction(e -> root.setCenter(new FlashcardsPanel()));
+
+        // Default center
+        root.setCenter(new Label("Welcome to StudyMate"));
+
+        // Scene + Stage
+        Scene scene = new Scene(root, 1000, 650);
         stage.setTitle("StudyMate (JavaFX)");
         stage.setScene(scene);
         stage.show();
-    }
-
-    private void setCenter(javafx.scene.Node node) {
-        root.setCenter(node);
     }
 }

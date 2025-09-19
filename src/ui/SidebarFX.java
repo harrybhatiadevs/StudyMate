@@ -21,7 +21,7 @@ public class SidebarFX extends VBox {
 
         Button chatBtn = fullButton("Chat");
         Button projectsBtn = fullButton("Projects");
-        Button templatesBtn = fullButton("Templates");
+        Button templatesBtn = fullButton("Flashcards");
         Button typingBtn = fullButton("Typing Practice");
         Button othersBtn = fullButton("Other Pages");
 
