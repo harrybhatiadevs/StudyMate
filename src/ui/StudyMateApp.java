@@ -2,25 +2,35 @@ package ui;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
+import javafx.geometry.Side;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import model.User;
+import model.UserDAO;
 import ui.views.*;
 
+/**
+ * Main JavaFX shell for StudyMate.
+ * - Left sidebar for navigation
+ * - Center area swaps views
+ * - Bottom-left account box: Sign in / Register or open Profile page
+ */
 public class StudyMateApp extends Application {
 
     private BorderPane root;
+    private UserDAO userDAO; // SQLite-backed user DAO
 
     @Override
     public void start(Stage stage) {
+        // Initialize DAO (create table if not exists). Fail silently to keep app launch robust.
+        userDAO = new UserDAO("jdbc:sqlite:studymate.db");
+        try { userDAO.init(); } catch (Exception ignored) {}
+
         root = new BorderPane();
 
-        // --- Sidebar (JavaFX) ---
+        // ----- Sidebar (JavaFX) -----
         VBox sidebar = new VBox(8);
         sidebar.setPadding(new Insets(12));
         sidebar.setPrefWidth(200);
@@ -34,13 +44,62 @@ public class StudyMateApp extends Application {
         for (Button b : new Button[]{chatBtn, projectsBtn, flashcardsBtn, typingBtn, othersBtn}) {
             b.setMaxWidth(Double.MAX_VALUE);
         }
+
+        // Spacer pushes account box to the very bottom
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
-        sidebar.getChildren().addAll(chatBtn, projectsBtn, flashcardsBtn, typingBtn, othersBtn, spacer);
 
+        // ----- Account box (bottom-left) -----
+        VBox accountBox = new VBox(6);
+        accountBox.getChildren().add(new Separator());
+
+        Button accountBtn = new Button("Sign in / Register");
+        accountBtn.setMaxWidth(Double.MAX_VALUE);
+        accountBox.getChildren().addAll(accountBtn);
+
+        // React to session changes: button text reflects current user
+        Session.get().onChange(u -> {
+            if (u == null) {
+                accountBtn.setText("Sign in / Register");
+            } else {
+                accountBtn.setText("Profile (" + u.getUsername() + ")");
+            }
+        });
+
+        // Account button behavior:
+        // - If no user: show quick menu to choose Sign in or Register
+        // - If signed in: open Profile page in center
+        accountBtn.setOnAction(e -> {
+            User current = Session.get().currentUser();
+            if (current == null) {
+                ContextMenu menu = new ContextMenu();
+                MenuItem loginItem = new MenuItem("Sign in");
+                MenuItem registerItem = new MenuItem("Register");
+
+                loginItem.setOnAction(ev -> {
+                    AuthDialog dlg = new AuthDialog(userDAO, AuthDialog.Mode.LOGIN);
+                    dlg.showAndWait().ifPresent(Session.get()::setUser);
+                });
+                registerItem.setOnAction(ev -> {
+                    AuthDialog dlg = new AuthDialog(userDAO, AuthDialog.Mode.REGISTER);
+                    dlg.showAndWait().ifPresent(Session.get()::setUser);
+                });
+
+                menu.getItems().addAll(loginItem, registerItem);
+                menu.show(accountBtn, Side.RIGHT, 0, 0);
+            } else {
+                root.setCenter(new ProfileView(userDAO));
+            }
+        });
+
+        // Assemble sidebar
+        sidebar.getChildren().addAll(
+                chatBtn, projectsBtn, flashcardsBtn, typingBtn, othersBtn,
+                spacer, accountBox
+        );
         root.setLeft(sidebar);
 
-        // --- Actions (center view switch) ---
+        // ----- Navigation actions (center view switch) -----
         chatBtn.setOnAction(e -> showChat());
         projectsBtn.setOnAction(e -> root.setCenter(new ProjectsView()));
         flashcardsBtn.setOnAction(e -> showFlashcards());
@@ -57,11 +116,11 @@ public class StudyMateApp extends Application {
         stage.show();
     }
 
-    // --- Views that might fail have fallbacks so app still starts ---
+    // ----- Views that might fail have fallbacks so app still starts -----
 
     private void showChat() {
         try {
-            // NOTE: ChatView will throw if GOOGLE_API_KEY is missing (GeminiClient).
+            // Note: ChatView throws if GOOGLE_API_KEY is missing (GeminiClient).
             root.setCenter(new ChatView());
         } catch (Throwable t) {
             Label msg = new Label(
