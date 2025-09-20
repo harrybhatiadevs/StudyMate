@@ -111,7 +111,7 @@ public class StudyMateApp extends Application {
 
         // Scene + Stage
         Scene scene = new Scene(root, 1000, 650);
-        stage.setTitle("StudyMate (JavaFX)");
+        stage.setTitle("StudyMate");
         stage.setScene(scene);
         stage.show();
     }
