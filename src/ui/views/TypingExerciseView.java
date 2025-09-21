@@ -168,7 +168,7 @@ public class TypingExerciseView extends BorderPane {
 
         if (correctEnd > 0) {
             Text ok = new Text(target.substring(0, correctEnd));
-            ok.setFill(Color.BLACK);
+            ok.setFill(Color.web("#32CD32")); // Lime Green (lighter, easier to see)
             ok.setFont(Font.font(16));
             targetFlow.getChildren().add(ok);
         }
@@ -203,12 +203,8 @@ public class TypingExerciseView extends BorderPane {
         return i;
     }
 
-    /** Compose a longer paragraph by concatenating several random samples. */
+    /** Pull a random text from the TextLibrary class */
     private static String buildParagraph() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(TextLibrary.getRandomText()).append(" ");
-        sb.append(TextLibrary.getRandomText()).append(" ");
-        sb.append(TextLibrary.getRandomText());
-        return sb.toString();
+        return TextLibrary.getRandomText();
     }
 }

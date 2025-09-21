@@ -24,7 +24,8 @@ public class TextLibrary {
             "Practice makes perfect. Keep pushing forward, even when it's tough.",
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness...",
-            "Life is a storm, my young friend. You will bask in the sunlight one moment, be shattered on the rocks the next. What makes you a man is what you do when that storm comes. You must look into that storm and shout as you did in Rome. Do your worst, for I will do mine! Then the fates will know you as we know you."
+            "Life is a storm, my young friend. You will bask in the sunlight one moment, be shattered on the rocks the next. What makes you a man is what you do when that storm comes. You must look into that storm and shout as you did in Rome. Do your worst, for I will do mine! Then the fates will know you as we know you.",
+            "We are not stoning you for any good work,” they replied, “but for blasphemy, because you, a mere man, claim to be God.”Jesus answered them, “Is it not written in your Law, ‘I have said you are “gods”’[d]?  If he called them ‘gods,’ to whom the word of God came—and Scripture cannot be set aside—  what about the one whom the Father set apart as his very own and sent into the world? Why then do you accuse me of blasphemy because I said, ‘I am God’s Son’? Do not believe me unless I do the works of my Father. 38 But if I do them, even though you do not believe me, believe the works, that you may know and understand that the Father is in me, and I in the Father.”",
     };
 
     public static String getRandomText() {
