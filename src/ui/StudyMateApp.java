@@ -149,8 +149,8 @@ public class StudyMateApp extends Application {
         TypingHomeView home = new TypingHomeView();
         home.setOnChoice(choice -> {
             switch (choice) {
-                case PRACTICE -> {
-                    TypingPracticeView view = new TypingPracticeView();
+                case RACE -> {
+                    TypingRaceView view = new TypingRaceView();
                     view.setOnBack(this::showTypingHome);
                     root.setCenter(view);
                 }

@@ -22,7 +22,7 @@ public class SidebarFX extends VBox {
         Button chatBtn = fullButton("Chat");
         Button projectsBtn = fullButton("Projects");
         Button templatesBtn = fullButton("Flashcards");
-        Button typingBtn = fullButton("Typing Practice");
+        Button typingBtn = fullButton("Typing Race");
         Button othersBtn = fullButton("Other Pages");
 
         chatBtn.setOnAction(e -> navigate(Target.CHAT));
