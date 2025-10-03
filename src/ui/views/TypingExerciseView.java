@@ -14,13 +14,6 @@ import javafx.util.Duration;
 import javafx.scene.paint.Color;
 import ui.TextLibrary;
 
-/**
- * TypingExerciseView: timed typing exercise with live highlighting and stats.
- * - Start: unlocks the input and starts the timer.
- * - Live highlight: correct prefix in black, wrong part in red/underlined, remaining in gray.
- * - Finish: computes WPM and Accuracy; Restart resets everything with a new paragraph.
- * - Back: navigate back to TypingHomeView (wired by StudyMateApp via setOnBack()).
- */
 public class TypingExerciseView extends BorderPane {
 
     // Header
@@ -31,9 +24,7 @@ public class TypingExerciseView extends BorderPane {
     // Body
     private final TextFlow targetFlow = new TextFlow();
     private final TextArea inputArea = new TextArea();
-    private final Button startBtn = new Button("Start");
-    private final Button finishBtn = new Button("Finish");
-    private final Button restartBtn = new Button("Restart");
+    private final Button nextBtn = new Button("Next");
 
     // Footer
     private final Label stats = new Label("");
@@ -43,6 +34,8 @@ public class TypingExerciseView extends BorderPane {
     private int elapsedSec = 0;
     private Timeline clock;
     private Runnable onBack;
+    private boolean exerciseStarted = false;
+    private int mistakesCount = 0;
 
     public TypingExerciseView() {
         setPadding(new Insets(10));
@@ -64,7 +57,7 @@ public class TypingExerciseView extends BorderPane {
         inputArea.setPrefRowCount(6);
         inputArea.setPrefHeight(160);
 
-        HBox actions = new HBox(8, startBtn, finishBtn, restartBtn);
+        HBox actions = new HBox(8, nextBtn);
         VBox center = new VBox(10, targetFlow, inputArea, actions);
         setCenter(center);
 
@@ -75,10 +68,32 @@ public class TypingExerciseView extends BorderPane {
 
         // Wiring
         backBtn.setOnAction(e -> { if (onBack != null) onBack.run(); });
-        startBtn.setOnAction(e -> startExercise());
-        finishBtn.setOnAction(e -> finishExercise());
-        restartBtn.setOnAction(e -> prepareRound());
-        inputArea.textProperty().addListener((obs, ov, nv) -> highlight(nv));
+        nextBtn.setOnAction(e -> prepareRound());
+
+        // Live typing listener
+        inputArea.textProperty().addListener((obs, oldValue, newValue) -> {
+            if (!exerciseStarted && newValue.length() > 0) {
+                startExercise();
+                exerciseStarted = true;
+            }
+
+            // Count new mistakes as the user types
+            int pos = newValue.length() - 1;
+            if (pos >= 0 && pos < target.length()) {
+                char typedChar = newValue.charAt(pos);
+                char targetChar = target.charAt(pos);
+                if (typedChar != targetChar) {
+                    mistakesCount++;
+                }
+            }
+
+            highlight(newValue);
+            updateStats(newValue);
+
+            if (newValue.equals(target)) {
+                finishExercise();
+            }
+        });
 
         // Timer
         clock = new Timeline(new KeyFrame(Duration.seconds(1), e -> tick()));
@@ -88,75 +103,62 @@ public class TypingExerciseView extends BorderPane {
         prepareRound();
     }
 
-    /** Parent can set a callback to go back to TypingHomeView. */
     public void setOnBack(Runnable r) { this.onBack = r; }
 
-    /** Prepare a fresh round with a new paragraph and reset UI. */
     private void prepareRound() {
-        target = buildParagraph();            // 2–3 random sentences
+        target = buildParagraph();
         renderTarget("", 0);
         inputArea.clear();
-        inputArea.setDisable(true);
-        startBtn.setDisable(false);
-        finishBtn.setDisable(true);
-        restartBtn.setDisable(true);
+        inputArea.setDisable(false);
+        exerciseStarted = false;
+        mistakesCount = 0;
+
+        nextBtn.setDisable(false);
         stats.setText("");
         elapsedSec = 0;
         timerLabel.setText("00:00");
         clock.stop();
     }
 
-    /** Begin the timed exercise. */
     private void startExercise() {
         elapsedSec = 0;
         timerLabel.setText("00:00");
         clock.playFromStart();
-
         inputArea.setDisable(false);
         inputArea.requestFocus();
-        startBtn.setDisable(true);
-        finishBtn.setDisable(false);
-        restartBtn.setDisable(true);
     }
 
-    /** Stop the exercise, compute WPM and Accuracy. */
     private void finishExercise() {
         clock.stop();
-        finishBtn.setDisable(true);
-        restartBtn.setDisable(false);
         inputArea.setDisable(true);
-
-        String typed = inputArea.getText();
-        double minutes = Math.max(1e-6, elapsedSec / 60.0); // guard against 0
-        int typedChars = typed.length();
-        int correct = correctPrefix(typed, target);
-        double accuracy = typedChars == 0 ? 0.0 : (correct * 100.0 / typedChars);
-        double wpm = (typedChars / 5.0) / minutes;
-
-        stats.setText(String.format("Time: %s | WPM: %.1f | Accuracy: %.1f%%",
-                timerLabel.getText(), wpm, accuracy));
+        updateStats(inputArea.getText());
     }
 
-    /** Update the digital clock each second. */
     private void tick() {
         elapsedSec++;
         int m = elapsedSec / 60;
         int s = elapsedSec % 60;
         timerLabel.setText(String.format("%02d:%02d", m, s));
+        updateStats(inputArea.getText());
     }
 
-    /** Live highlighting while typing. */
+    private void updateStats(String typed) {
+        double minutes = Math.max(1.0 / 60.0, elapsedSec / 60.0); // min 1 second
+        int correctChars = Math.min(typed.length(), target.length()) - mistakesCount;
+        if (correctChars < 0) correctChars = 0;
+
+        double accuracy = typed.length() == 0 ? 0.0 : (100.0 * correctChars / typed.length());
+        double wpm = (typed.length() / 5.0) / minutes;
+
+        stats.setText(String.format("Time: %s | WPM: %.1f | Accuracy: %.1f%%",
+                timerLabel.getText(), wpm, accuracy));
+    }
+
     private void highlight(String typed) {
         int firstMismatch = firstMismatchIndex(typed, target);
         renderTarget(typed, firstMismatch);
     }
 
-    /**
-     * Render target string with 3 colored segments:
-     *  - [0, correctEnd): black
-     *  - [correctEnd, mismatchEnd): red + underline
-     *  - [mismatchEnd, end): gray
-     */
     private void renderTarget(String typed, int firstMismatch) {
         targetFlow.getChildren().clear();
         if (typed == null) typed = "";
@@ -168,7 +170,7 @@ public class TypingExerciseView extends BorderPane {
 
         if (correctEnd > 0) {
             Text ok = new Text(target.substring(0, correctEnd));
-            ok.setFill(Color.web("#32CD32")); // Lime Green (lighter, easier to see)
+            ok.setFill(Color.web("#32CD32"));
             ok.setFont(Font.font(16));
             targetFlow.getChildren().add(ok);
         }
@@ -187,7 +189,6 @@ public class TypingExerciseView extends BorderPane {
         }
     }
 
-    /** First index where typed and target differ; prefix length if typed is a prefix. */
     private static int firstMismatchIndex(String typed, String target) {
         int i = 0;
         int max = Math.min(typed.length(), target.length());
@@ -195,15 +196,6 @@ public class TypingExerciseView extends BorderPane {
         return i;
     }
 
-    /** Number of correct leading characters. */
-    private static int correctPrefix(String typed, String target) {
-        int i = 0;
-        int max = Math.min(typed.length(), target.length());
-        while (i < max && typed.charAt(i) == target.charAt(i)) i++;
-        return i;
-    }
-
-    /** Pull a random text from the TextLibrary class */
     private static String buildParagraph() {
         return TextLibrary.getRandomText();
     }
