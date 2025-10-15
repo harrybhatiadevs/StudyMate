@@ -29,25 +29,19 @@ public class SidebarFX extends VBox {
 
         Button chatBtn = fullButton("Chat");
         Button projectsBtn = fullButton("Projects");
-        Button templatesBtn = fullButton("Flashcards");
-        Button typingBtn = fullButton("Typing Practice");
 
         styleNavButton(chatBtn);
         styleNavButton(projectsBtn);
-        styleNavButton(templatesBtn);
-        styleNavButton(typingBtn);
 
 
         chatBtn.setOnAction(e -> navigate(Target.CHAT));
         projectsBtn.setOnAction(e -> navigate(Target.PROJECTS));
-        templatesBtn.setOnAction(e -> navigate(Target.TEMPLATES));
-        typingBtn.setOnAction(e -> navigate(Target.TYPING));
 
 
         VBox spacer = new VBox();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        getChildren().addAll(chatBtn, projectsBtn, templatesBtn, typingBtn, spacer);
+        getChildren().addAll(chatBtn, projectsBtn, spacer);
         setAlignment(Pos.TOP_CENTER);
     }
 

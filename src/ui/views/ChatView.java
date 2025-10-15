@@ -13,6 +13,7 @@ import javafx.scene.text.Text;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.Stop;
+import ui.GeminiClient;
 
 public class ChatView extends BorderPane {
 
@@ -20,9 +21,23 @@ public class ChatView extends BorderPane {
     private final ScrollPane scrollPane = new ScrollPane();
     private final TextField inputField = new TextField();
     private final Button sendBtn = new Button("Send");
+    private GeminiClient geminiClient;
 
     public ChatView() {
         setPadding(new Insets(16));
+
+        // Initialize Gemini client
+        String apiKey = System.getenv("GOOGLE_API_KEY");
+        if (apiKey != null && !apiKey.isEmpty()) {
+            try {
+                geminiClient = new GeminiClient(apiKey);
+                System.out.println("ChatView: Gemini AI initialized");
+            } catch (Exception e) {
+                System.err.println("ChatView: Failed to initialize Gemini: " + e.getMessage());
+            }
+        } else {
+            System.out.println("ChatView: GOOGLE_API_KEY not found - using mock responses");
+        }
 
         // ----- Chat area -----
         scrollPane.setFitToWidth(true);
@@ -87,6 +102,7 @@ public class ChatView extends BorderPane {
     private void addAiTyping() {
         typingBubble = makeBubble("...", Pos.CENTER_LEFT, Color.web("#ffffff"), Color.web("#25324B"));
         chatBox.getChildren().add(typingBubble);
+        scrollPane.setVvalue(1.0);
     }
     private void removeAiTyping() {
         chatBox.getChildren().remove(typingBubble);
@@ -95,16 +111,38 @@ public class ChatView extends BorderPane {
     /** Runs the AI call off the FX thread and posts the reply. */
     private void generateAiAsync(String prompt) {
         new Thread(() -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException ignored) {}
+            String response;
+
+            if (geminiClient != null) {
+                // Use real Gemini AI
+                try {
+                    System.out.println("Calling Gemini AI with prompt: " + prompt);
+
+                    // Add context to make Gemini act as a study assistant
+                    String contextualPrompt = "You are a helpful study assistant. " +
+                            "Help students learn by explaining concepts clearly, " +
+                            "summarizing information, and creating study materials. " +
+                            "Keep responses concise and educational.\n\n" +
+                            "Student question: " + prompt;
+
+                    response = geminiClient.askGemini(contextualPrompt);
+                    System.out.println("Gemini response received");
+                } catch (Exception e) {
+                    System.err.println("Error calling Gemini: " + e.getMessage());
+                    response = "Sorry, I encountered an error: " + e.getMessage();
+                }
+            } else {
+                // Fall back to mock response if no API key
+                response = mockReply(prompt) + "\n\n(Note: Set GOOGLE_API_KEY environment variable to enable real AI responses)";
+            }
+
+            final String finalResponse = response;
             Platform.runLater(() -> {
                 removeAiTyping();
-                addAiMessage(mockReply(prompt));
+                addAiMessage(finalResponse);
             });
-        }, "local-ai-mock").start();
+        }, "gemini-ai-thread").start();
     }
-
 
     private String mockReply(String userText) {
         if (userText == null || userText.isBlank()) return "How can I help?";

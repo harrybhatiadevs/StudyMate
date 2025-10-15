@@ -14,6 +14,7 @@ public class FlashcardDAO {
     public void init() throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl);
              Statement st = conn.createStatement()) {
+            conn.setAutoCommit(true); // Ensure auto-commit is enabled
             st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS flashcards (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,13 +37,33 @@ public class FlashcardDAO {
 
     /** Insert a new flashcard into the table. */
     public void insert(Flashcard card) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO flashcards(topic, question, answer) VALUES (?,?,?)")) {
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DriverManager.getConnection(jdbcUrl);
+            conn.setAutoCommit(false); // Start transaction
+
+            ps = conn.prepareStatement(
+                    "INSERT INTO flashcards(topic, question, answer) VALUES (?,?,?)");
             ps.setString(1, card.getTopic());
             ps.setString(2, card.getQuestion());
             ps.setString(3, card.getAnswer());
             ps.executeUpdate();
+
+            conn.commit(); // Explicitly commit the transaction
+            System.out.println("Flashcard inserted successfully: " + card.getQuestion());
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback(); // Rollback on error
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            throw e; // Re-throw the exception
+        } finally {
+            if (ps != null) ps.close();
+            if (conn != null) conn.close();
         }
     }
 
@@ -67,5 +88,21 @@ public class FlashcardDAO {
                 return Optional.empty();
             }
         }
+    }
+
+    /** Get all flashcards for debugging purposes. */
+    public List<Flashcard> getAll() throws SQLException {
+        List<Flashcard> cards = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(jdbcUrl);
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT topic, question, answer FROM flashcards")) {
+            while (rs.next()) {
+                cards.add(new Flashcard(
+                        rs.getString("topic"),
+                        rs.getString("question"),
+                        rs.getString("answer")));
+            }
+        }
+        return cards;
     }
 }

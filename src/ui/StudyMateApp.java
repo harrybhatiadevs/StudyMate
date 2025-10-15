@@ -11,13 +11,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import ui.views.ChatView;
-import ui.SidebarFX;
 
 public class StudyMateApp extends Application {
     private BorderPane root;
-    private final ChatView chatView = new ChatView();
     private SidebarFX sidebar;
+    private GeminiClient geminiClient;
 
     public static void main(String[] args) {
         launch(args);
@@ -25,7 +23,21 @@ public class StudyMateApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        // Initialize Gemini client
+        String apiKey = System.getenv("GOOGLE_API_KEY");
+        if (apiKey != null && !apiKey.isEmpty()) {
+            try {
+                geminiClient = new GeminiClient(apiKey);
+                System.out.println("Gemini AI initialized successfully");
+            } catch (Exception e) {
+                System.err.println("Failed to initialize Gemini: " + e.getMessage());
+            }
+        } else {
+            System.out.println("GOOGLE_API_KEY not found - AI features will be disabled");
+        }
+
         root = new BorderPane();
+
         // Top bar with Home button
         HBox topBar = new HBox();
         topBar.setPadding(new Insets(8, 12, 8, 12));
@@ -34,9 +46,18 @@ public class StudyMateApp extends Application {
         topBar.getChildren().add(homeBtn);
         root.setTop(topBar);
         homeBtn.setOnAction(e -> showHome());
-        // Sidebar (left)
+
+        // Sidebar
         sidebar = new SidebarFX();
+        sidebar.setOnNavigate(target -> {
+            switch (target) {
+                case CHAT -> showAISummary();
+                case PROJECTS -> System.out.println("Projects clicked - not implemented yet");
+                default -> System.out.println("Navigation: " + target);
+            }
+        });
         root.setLeft(sidebar);
+
         Scene scene = new Scene(root, 1000, 700);
         stage.setTitle("StudyMate");
         stage.setScene(scene);
@@ -44,9 +65,7 @@ public class StudyMateApp extends Application {
         showHome();
     }
 
-    /** Home screen with input; Submit/Enter opens Chat and sends first prompt */
     private void showHome() {
-        //Centred pill buttons + underline, big circle CTA, and input row
         HBox pills = new HBox(20);
         Button typingPill = Style.pill("Typing Practice");
         Button flashPill  = Style.pill("Flash cards");
@@ -57,11 +76,9 @@ public class StudyMateApp extends Application {
         pillSection.setAlignment(Pos.CENTER);
         pillSection.setPadding(new Insets(24, 0, 24, 0));
 
-        // Big circle CTA (fix size so it doesn't stretch)
         StackPane circle = Style.circleCTA("Type to begin");
-        circle.setMaxSize(340, 340); // prevent horizontal stretch
+        circle.setMaxSize(340, 340);
 
-        // Input + submit (rounded)
         TextField input = new TextField();
         input.setPromptText("Type here");
         Style.roundTextField(input);
@@ -75,42 +92,56 @@ public class StudyMateApp extends Application {
         centerContent.setPadding(new Insets(24, 16, 16, 16));
         root.setCenter(centerContent);
 
-        // Home → Chat with initial prompt
-        Runnable goToChatWithPrompt = () -> {
+        Runnable goToAI = () -> {
             String prompt = input.getText() == null ? "" : input.getText().trim();
             if (prompt.isEmpty()) return;
             input.clear();
-            chatView.startConversation(prompt);
-            showChat();
+            showAISummaryWithPrompt(prompt);
         };
-        submit.setOnAction(e -> goToChatWithPrompt.run());
-        input.setOnAction(e -> goToChatWithPrompt.run());
+        submit.setOnAction(e -> goToAI.run());
+        input.setOnAction(e -> goToAI.run());
 
-        // Pills wiring → navigate to views
         typingPill.setOnAction(e -> showTypingHome());
         flashPill.setOnAction(e -> showFlashcards());
     }
 
-    /** Switches centre to the Chat view */
-    private void showChat() {
-        root.setCenter(chatView);
+    private void showAISummaryWithPrompt(String prompt) {
+        if (geminiClient == null) {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.WARNING,
+                    "AI features are not available. Please set GOOGLE_API_KEY environment variable.");
+            alert.showAndWait();
+            return;
+        }
+        root.setCenter(new AISummaryView(geminiClient, this::showTypingWithText, prompt));
     }
 
-    /** Placeholder Typing Practice view */
     private void showTypingHome() {
-        VBox v = new TypingPracticeView();
-        root.setCenter(v);
+        root.setCenter(new TypingPracticeView(null));
     }
 
-    /** Placeholder Flashcards view */
+    private void showTypingWithText(String text) {
+        root.setCenter(new TypingPracticeView(text));
+    }
+
     private void showFlashcards() {
-        VBox v = new FlashcardsView();
-        root.setCenter(v);
+        root.setCenter(new FlashcardsView());
     }
 
-    /** Simple JavaFX Flashcards view backed by model.FlashcardDAO */
+    private void showAISummary() {
+        if (geminiClient == null) {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.WARNING,
+                    "AI features are not available. Please set GOOGLE_API_KEY environment variable.");
+            alert.showAndWait();
+            return;
+        }
+        root.setCenter(new AISummaryView(geminiClient, this::showTypingWithText, null));
+    }
+
+    // ===== FLASHCARDS VIEW =====
     private static final class FlashcardsView extends VBox {
-        private final model.FlashcardDAO dao = new model.FlashcardDAO("jdbc:sqlite:studymate.db");
+        private final model.FlashcardDAO dao = new model.FlashcardDAO(buildDbUrl());
         private java.util.List<model.Flashcard> cards = java.util.Collections.emptyList();
         private int idx = 0;
 
@@ -124,57 +155,54 @@ public class StudyMateApp extends Application {
         private final javafx.scene.control.Label verdict = new javafx.scene.control.Label(" ");
         private final javafx.scene.control.TextArea revealArea = new javafx.scene.control.TextArea();
 
+        private static String buildDbUrl() {
+            String home = System.getProperty("user.home");
+            java.nio.file.Path dir = java.nio.file.Paths.get(home, "StudyMate");
+            try {
+                java.nio.file.Files.createDirectories(dir);
+            } catch (java.io.IOException ignored) { }
+            return "jdbc:sqlite:" + dir.resolve("studymate.db").toAbsolutePath();
+        }
+
         FlashcardsView() {
             super(10);
             setPadding(new Insets(16));
             setAlignment(Pos.TOP_CENTER);
 
-            // Top bar
+            try {
+                dao.init();
+            } catch (java.sql.SQLException ex) {
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                        "Failed to initialise flashcards DB:\n" + ex.getMessage()).showAndWait();
+            }
+
+            javafx.scene.control.Label dbPath = new javafx.scene.control.Label("DB: " + buildDbUrl());
+            dbPath.setStyle("-fx-font-size: 11px; -fx-text-fill: #777;");
+
             HBox top = new HBox(10, new javafx.scene.control.Label("Flashcards"), counter, prevBtn, nextBtn, addBtn);
             top.setAlignment(Pos.CENTER_LEFT);
-            getChildren().add(top);
 
-            // Question area
             questionArea.setEditable(false);
             questionArea.setWrapText(true);
             questionArea.setPrefRowCount(6);
             questionArea.setMaxWidth(760);
-            getChildren().add(questionArea);
 
-            // Answer row
-            HBox inputRow = new HBox(8,
-                    new javafx.scene.control.Label("Your answer:"), yourAnswer, checkBtn
-            );
+            HBox inputRow = new HBox(8, new javafx.scene.control.Label("Your answer:"), yourAnswer, checkBtn);
             inputRow.setAlignment(Pos.CENTER_LEFT);
             HBox.setHgrow(yourAnswer, javafx.scene.layout.Priority.ALWAYS);
             yourAnswer.setMaxWidth(760);
-            getChildren().add(inputRow);
 
             verdict.setTextFill(javafx.scene.paint.Color.web("#1e8221"));
-            getChildren().add(verdict);
 
             revealArea.setEditable(false);
             revealArea.setWrapText(true);
             revealArea.setVisible(false);
             revealArea.setMaxWidth(760);
-            getChildren().add(revealArea);
 
-            // Actions
+            getChildren().addAll(dbPath, top, questionArea, inputRow, verdict, revealArea);
+
             prevBtn.setOnAction(e -> { if (idx > 0) { idx--; showCard(); } });
-            nextBtn.setOnAction(e -> {
-                try {
-                    java.util.Optional<model.Flashcard> opt2 = dao.random(null);
-                    if (opt2.isPresent()) {
-                        cards = java.util.List.of(opt2.get());
-                        idx = 0;
-                        showCard();
-                    } else {
-                        questionArea.setText("No flashcards found. Click 'Add' to create one.");
-                    }
-                } catch (java.sql.SQLException ex) {
-                    questionArea.setText("DB error while loading a random card:\n" + ex.getMessage());
-                }
-            });
+            nextBtn.setOnAction(e -> { if (idx < cards.size() - 1) { idx++; showCard(); } });
             checkBtn.setOnAction(e -> checkAnswer());
             addBtn.setOnAction(e -> addCardDialog());
             yourAnswer.setOnAction(e -> checkAnswer());
@@ -184,36 +212,40 @@ public class StudyMateApp extends Application {
 
         private void refresh() {
             try {
-                java.util.Optional<model.Flashcard> opt = dao.random(null);
-                if (opt.isEmpty()) {
-                    cards = java.util.Collections.emptyList();
-                } else {
-                    cards = java.util.List.of(opt.get());
-                    idx = 0;
+                cards = dao.getAll();
+                if (!cards.isEmpty()) {
+                    java.util.List<model.Flashcard> shuffled = new java.util.ArrayList<>(cards);
+                    java.util.Collections.shuffle(shuffled);
+                    cards = shuffled;
                 }
+                idx = 0;
             } catch (java.sql.SQLException ex) {
                 cards = java.util.Collections.emptyList();
-                questionArea.setText("DB error while loading cards:\n" + ex.getMessage());
+                questionArea.setText("DB error: " + ex.getMessage());
             }
 
-            if (cards == null || cards.isEmpty()) {
+            try {
+                int n = dao.count();
+                counter.setText(n + (n == 1 ? " card" : " cards"));
+            } catch (java.sql.SQLException ignore) {
+                counter.setText("0 cards");
+            }
+
+            if (cards.isEmpty()) {
                 questionArea.setText("No flashcards yet.\nClick 'Add' to create one.");
                 yourAnswer.setDisable(true);
                 checkBtn.setDisable(true);
                 prevBtn.setDisable(true);
                 nextBtn.setDisable(true);
-                counter.setText("0/0");
                 verdict.setText(" ");
                 revealArea.setVisible(false);
-                revealArea.setText("");
-                return;
+            } else {
+                yourAnswer.setDisable(false);
+                checkBtn.setDisable(false);
+                prevBtn.setDisable(false);
+                nextBtn.setDisable(false);
+                showCard();
             }
-            yourAnswer.setDisable(false);
-            checkBtn.setDisable(false);
-            prevBtn.setDisable(false);
-            nextBtn.setDisable(false);
-            idx = Math.max(0, Math.min(idx, cards.size()-1));
-            showCard();
         }
 
         private void showCard() {
@@ -223,16 +255,14 @@ public class StudyMateApp extends Application {
             verdict.setText(" ");
             verdict.setTextFill(javafx.scene.paint.Color.web("#1e8221"));
             revealArea.setVisible(false);
-            revealArea.setText("");
             yourAnswer.clear();
             yourAnswer.requestFocus();
-
             prevBtn.setDisable(idx == 0);
             nextBtn.setDisable(idx >= cards.size()-1);
         }
 
         private void checkAnswer() {
-            if (cards == null || cards.isEmpty()) return;
+            if (cards.isEmpty()) return;
             model.Flashcard c = cards.get(idx);
             String typed = normalize(yourAnswer.getText());
             String correct = normalize(c.getAnswer());
@@ -244,88 +274,414 @@ public class StudyMateApp extends Application {
         }
 
         private void addCardDialog() {
-            // Question
             javafx.scene.control.TextInputDialog qDlg = new javafx.scene.control.TextInputDialog();
             qDlg.setTitle("Add Flashcard");
-            qDlg.setHeaderText(null);
             qDlg.setContentText("Question:");
             String q = qDlg.showAndWait().orElse(null);
             if (q == null || q.isBlank()) return;
 
-            // Answer
             javafx.scene.control.TextInputDialog aDlg = new javafx.scene.control.TextInputDialog();
             aDlg.setTitle("Add Flashcard");
-            aDlg.setHeaderText(null);
             aDlg.setContentText("Answer:");
             String a = aDlg.showAndWait().orElse(null);
             if (a == null || a.isBlank()) return;
 
-            // Optional topic
             javafx.scene.control.TextInputDialog tDlg = new javafx.scene.control.TextInputDialog();
             tDlg.setTitle("Add Flashcard");
-            tDlg.setHeaderText(null);
             tDlg.setContentText("Topic (optional):");
             String topic = tDlg.showAndWait().orElse("");
 
             try {
-                // Flashcard requires (topic, question, answer)
                 dao.insert(new model.Flashcard(topic, q.trim(), a.trim()));
                 refresh();
-            } catch (Exception ex) {
-                javafx.scene.control.Alert aerr = new javafx.scene.control.Alert(
-                        javafx.scene.control.Alert.AlertType.ERROR,
-                        "Failed to add card:\n" + ex.getMessage()
-                );
-                aerr.showAndWait();
+            } catch (java.sql.SQLException ex) {
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR,
+                        "Failed to add card:\n" + ex.getMessage()).showAndWait();
             }
         }
 
         private static String normalize(String s) {
-            if (s == null) return "";
-            return s.trim().replaceAll("\\s+", " ");
+            return s == null ? "" : s.trim().replaceAll("\\s+", " ");
         }
     }
 
-    /** Minimal Typing Practice view */
+    // ===== TYPING PRACTICE VIEW =====
     private static final class TypingPracticeView extends VBox {
-        private final String sample = "The quick brown fox jumps over the lazy dog.";
-        private final javafx.scene.control.TextArea target = new javafx.scene.control.TextArea(sample);
-        private final javafx.scene.control.TextArea input  = new javafx.scene.control.TextArea();
+        private String sample;
+        private final javafx.scene.control.Label ghostLabel = new javafx.scene.control.Label();
+        private final javafx.scene.control.TextArea input = new javafx.scene.control.TextArea();
         private final javafx.scene.control.Label stats = new javafx.scene.control.Label("Start typing to begin…");
+        private final javafx.scene.control.Button resetBtn = new javafx.scene.control.Button("Reset");
+        private final javafx.scene.control.ProgressBar progressBar = new javafx.scene.control.ProgressBar(0);
         private long startTs = 0L;
 
-        TypingPracticeView() {
-            super(12);
-            setPadding(new Insets(16));
+        TypingPracticeView(String customText) {
+            super(24);
+            setPadding(new Insets(32));
             setAlignment(Pos.TOP_CENTER);
+            setStyle("-fx-background-color: linear-gradient(to bottom, #f5f7fa 0%, #e8ecf1 100%);");
 
-            target.setEditable(false);
-            target.setWrapText(true);
-            target.setMaxWidth(760);
+            sample = (customText != null && !customText.trim().isEmpty())
+                    ? customText.trim()
+                    : "The quick brown fox jumps over the lazy dog. Practice makes perfect!";
+
+            System.out.println("=== TYPING PRACTICE ===");
+            System.out.println("Sample text: " + sample);
+            System.out.println("Sample length: " + sample.length());
+
+            // Title and Reset Button Row
+            javafx.scene.control.Label title = new javafx.scene.control.Label("Typing Practice");
+            title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #1a1f36;");
+
+            resetBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #fff7e6, #ffe8b3); " +
+                    "-fx-text-fill: #25324B; -fx-font-weight: 600; -fx-font-size: 14px; " +
+                    "-fx-padding: 12 24; -fx-background-radius: 20; -fx-cursor: hand; " +
+                    "-fx-border-color: transparent; -fx-border-width: 0;");
+            resetBtn.setEffect(createShadow(0.12));
+
+            // Hover effect for reset button
+            resetBtn.setOnMouseEntered(e -> resetBtn.setStyle(
+                    "-fx-background-color: linear-gradient(to bottom, #ffeb99, #ffd966); " +
+                            "-fx-text-fill: #25324B; -fx-font-weight: 600; -fx-font-size: 14px; " +
+                            "-fx-padding: 12 24; -fx-background-radius: 20; -fx-cursor: hand;"));
+            resetBtn.setOnMouseExited(e -> resetBtn.setStyle(
+                    "-fx-background-color: linear-gradient(to bottom, #fff7e6, #ffe8b3); " +
+                            "-fx-text-fill: #25324B; -fx-font-weight: 600; -fx-font-size: 14px; " +
+                            "-fx-padding: 12 24; -fx-background-radius: 20; -fx-cursor: hand;"));
+
+            HBox topBar = new HBox(24, title, resetBtn);
+            topBar.setAlignment(Pos.CENTER);
+
+            // Main card container
+            VBox card = new VBox(20);
+            card.setStyle("-fx-background-color: white; -fx-background-radius: 16; -fx-padding: 32; " +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 16, 0, 0, 4);");
+            card.setMaxWidth(950);
+            card.setAlignment(Pos.CENTER);
+
+            // Instructions with icon
+            javafx.scene.control.Label instructions = new javafx.scene.control.Label("📝 Type the text below as accurately as possible:");
+            instructions.setStyle("-fx-font-size: 15px; -fx-text-fill: #64748b; -fx-font-weight: 500;");
+
+            // Reference text box (ghost text)
+            VBox ghostBox = new VBox(8);
+            ghostBox.setStyle("-fx-background-color: #fef3c7; -fx-border-color: #fbbf24; " +
+                    "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12; " +
+                    "-fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(251, 191, 36, 0.2), 8, 0, 0, 2);");
+            ghostBox.setMaxWidth(880);
+
+            javafx.scene.control.Label ghostTitle = new javafx.scene.control.Label("Reference Text");
+            ghostTitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #92400e; -fx-font-weight: 600; " +
+                    "-fx-letter-spacing: 0.5;");
+
+            ghostLabel.setText(sample);
+            ghostLabel.setWrapText(true);
+            ghostLabel.setMaxWidth(840);
+            ghostLabel.setStyle("-fx-font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace; " +
+                    "-fx-font-size: 16px; -fx-text-fill: #78350f; -fx-line-spacing: 1.6;");
+
+            ghostBox.getChildren().addAll(ghostTitle, ghostLabel);
+
+            // Spacing between boxes
+            javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+            spacer.setPrefHeight(12);
+
+            // Your typing box
+            VBox inputBox = new VBox(8);
+            inputBox.setStyle("-fx-background-color: #f8fafc; -fx-border-color: #10b981; " +
+                    "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12; " +
+                    "-fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.15), 8, 0, 0, 2);");
+            inputBox.setMaxWidth(880);
+
+            javafx.scene.control.Label inputTitle = new javafx.scene.control.Label("Your Typing");
+            inputTitle.setStyle("-fx-font-size: 12px; -fx-text-fill: #065f46; -fx-font-weight: 600; " +
+                    "-fx-letter-spacing: 0.5;");
+
+            input.setPromptText("Start typing here...");
             input.setWrapText(true);
-            input.setMaxWidth(760);
+            input.setStyle("-fx-font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace; " +
+                    "-fx-font-size: 16px; -fx-text-fill: #1e293b; -fx-control-inner-background: transparent; " +
+                    "-fx-background-color: transparent; -fx-border-color: transparent; " +
+                    "-fx-focus-color: transparent; -fx-faint-focus-color: transparent; " +
+                    "-fx-highlight-fill: #bfdbfe; -fx-highlight-text-fill: #1e40af; " +
+                    "-fx-padding: 8 0 8 0; -fx-line-spacing: 1.6;");
+            input.setPrefRowCount(Math.min(12, sample.split("\n").length + 2));
+            input.setMaxWidth(840);
 
-            getChildren().addAll(new javafx.scene.control.Label("Typing Practice"), target, input, stats);
+            inputBox.getChildren().addAll(inputTitle, input);
 
+            // Progress bar with modern styling
+            progressBar.setMaxWidth(880);
+            progressBar.setPrefHeight(8);
+            progressBar.setStyle("-fx-accent: linear-gradient(to right, #10b981, #059669); " +
+                    "-fx-background-color: #e5e7eb; -fx-background-radius: 4; -fx-padding: 0;");
+
+            // Stats display with better layout
+            HBox statsBox = new HBox(16);
+            statsBox.setAlignment(Pos.CENTER);
+            statsBox.setStyle("-fx-background-color: #f1f5f9; -fx-padding: 16 24; " +
+                    "-fx-background-radius: 10;");
+
+            stats.setStyle("-fx-font-size: 15px; -fx-font-weight: 600; -fx-text-fill: #334155;");
+            statsBox.getChildren().add(stats);
+
+            // Add all elements to card
+            card.getChildren().addAll(instructions, ghostBox, spacer, inputBox, progressBar, statsBox);
+            getChildren().addAll(topBar, card);
+
+            // Event handlers
             input.textProperty().addListener((obs, oldV, newV) -> {
                 if (startTs == 0L && !newV.isBlank()) startTs = System.currentTimeMillis();
+                updateDisplay(newV);
                 updateStats(newV);
             });
+
+            resetBtn.setOnAction(e -> reset());
+            javafx.application.Platform.runLater(() -> input.requestFocus());
+        }
+
+        private void updateDisplay(String typed) {
+            if (sample == null || sample.isEmpty()) return;
+            int len = typed.length();
+
+            if (len == 0) {
+                ghostLabel.setText(sample);
+                ghostLabel.setVisible(true);
+                ghostLabel.setOpacity(1.0);
+            } else if (len >= sample.length()) {
+                ghostLabel.setText("✓ Text completed!");
+                ghostLabel.setStyle("-fx-font-family: 'System'; -fx-font-size: 18px; " +
+                        "-fx-text-fill: #059669; -fx-font-weight: 600; -fx-line-spacing: 1.6;");
+            } else {
+                String remaining = sample.substring(len);
+                ghostLabel.setText(remaining);
+                ghostLabel.setVisible(true);
+                ghostLabel.setStyle("-fx-font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace; " +
+                        "-fx-font-size: 16px; -fx-text-fill: #78350f; -fx-line-spacing: 1.6;");
+                double progress = (double) len / sample.length();
+                ghostLabel.setOpacity(Math.max(0.35, 1.0 - (progress * 0.65)));
+            }
         }
 
         private void updateStats(String typed) {
-            int chars = typed.length();
+            if (sample == null || sample.isEmpty()) return;
+
+            int len = typed.length();
             int correct = 0;
-            for (int i = 0; i < Math.min(typed.length(), sample.length()); i++) {
+            for (int i = 0; i < Math.min(len, sample.length()); i++) {
                 if (typed.charAt(i) == sample.charAt(i)) correct++;
             }
-            double acc = (sample.isEmpty()) ? 0 : (100.0 * correct / Math.max(typed.length(), 1));
-            double minutes = Math.max((System.currentTimeMillis() - startTs) / 60000.0, 1e-6);
-            int wpm = (int)Math.round((chars / 5.0) / minutes);
-            stats.setText(String.format("WPM: %d | Accuracy: %.1f%%", wpm, acc));
+
+            double acc = (len == 0) ? 100.0 : (100.0 * correct / len);
+            double mins = Math.max((System.currentTimeMillis() - startTs) / 60000.0, 1e-6);
+            int wpm = (int)Math.round((len / 5.0) / mins);
+            double prog = Math.min(1.0, (double) len / sample.length());
+            progressBar.setProgress(prog);
+
+            if (len >= sample.length()) {
+                if (typed.equals(sample)) {
+                    stats.setText(String.format("🎉 PERFECT! • WPM: %d • Accuracy: %.1f%%", wpm, acc));
+                    stats.setStyle("-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #059669;");
+                } else {
+                    stats.setText(String.format("✓ Completed • WPM: %d • Accuracy: %.1f%%", wpm, acc));
+                    stats.setStyle("-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #ea580c;");
+                }
+            } else {
+                stats.setText(String.format("WPM: %d  •  Accuracy: %.1f%%  •  Progress: %.0f%%",
+                        wpm, acc, prog * 100));
+                stats.setStyle("-fx-font-size: 15px; -fx-font-weight: 600; -fx-text-fill: #334155;");
+            }
+        }
+
+        private void reset() {
+            input.clear();
+            startTs = 0L;
+            ghostLabel.setText(sample);
+            ghostLabel.setVisible(true);
+            ghostLabel.setOpacity(1.0);
+            ghostLabel.setStyle("-fx-font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace; " +
+                    "-fx-font-size: 16px; -fx-text-fill: #78350f; -fx-line-spacing: 1.6;");
+            progressBar.setProgress(0);
+            stats.setText("Start typing to begin…");
+            stats.setStyle("-fx-font-size: 15px; -fx-font-weight: 600; -fx-text-fill: #334155;");
+            input.requestFocus();
+        }
+
+        private javafx.scene.effect.DropShadow createShadow(double opacity) {
+            javafx.scene.effect.DropShadow shadow = new javafx.scene.effect.DropShadow();
+            shadow.setColor(javafx.scene.paint.Color.rgb(0, 0, 0, opacity));
+            shadow.setRadius(12);
+            shadow.setSpread(0.1);
+            shadow.setOffsetY(4);
+            return shadow;
         }
     }
-    // ===== Programmatic styling helpers (no external CSS) =====
+
+    // ===== AI SUMMARY VIEW =====
+    private static final class AISummaryView extends VBox {
+        private final GeminiClient gemini;
+        private final java.util.function.Consumer<String> onSendToTyping;
+        private final javafx.scene.control.TextArea inputArea = new javafx.scene.control.TextArea();
+        private final javafx.scene.control.TextArea outputArea = new javafx.scene.control.TextArea();
+        private final javafx.scene.control.Button summarizeBtn = new javafx.scene.control.Button("Summarize");
+        private final javafx.scene.control.Button keyPointsBtn = new javafx.scene.control.Button("Key Points");
+        private final javafx.scene.control.Button flashcardsBtn = new javafx.scene.control.Button("Generate Flashcards");
+        private final javafx.scene.control.Button sendBtn = new javafx.scene.control.Button("Send");
+        private final javafx.scene.control.Button sendToTypingBtn = new javafx.scene.control.Button("⌨️ Send to Typing Practice");
+        private final javafx.scene.control.ProgressIndicator progressIndicator = new javafx.scene.control.ProgressIndicator();
+
+        AISummaryView(GeminiClient gemini, java.util.function.Consumer<String> onSendToTyping, String initialPrompt) {
+            super(20);
+            this.gemini = gemini;
+            this.onSendToTyping = onSendToTyping;
+            setPadding(new Insets(20));
+            setAlignment(Pos.TOP_CENTER);
+            setStyle("-fx-background-color: #f8f9fa;");
+
+            javafx.scene.control.Label title = new javafx.scene.control.Label("AI Study Assistant");
+            title.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #25324B;");
+
+            VBox inputCard = new VBox(12);
+            inputCard.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-padding: 20; " +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+            inputCard.setMaxWidth(900);
+
+            javafx.scene.control.Label inputLabel = new javafx.scene.control.Label("Ask a question or paste text:");
+            inputLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #25324B;");
+
+            inputArea.setPromptText("Type your question or paste text to analyze...");
+            inputArea.setWrapText(true);
+            inputArea.setPrefRowCount(6);
+            inputArea.setStyle("-fx-font-size: 13px; -fx-border-color: #e0e0e0; -fx-border-radius: 8; -fx-background-radius: 8;");
+
+            sendBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #ffeaa3, #f1cf7f); " +
+                    "-fx-text-fill: #25324B; -fx-font-weight: bold; -fx-font-size: 14px; " +
+                    "-fx-padding: 12 30; -fx-background-radius: 20;");
+            sendBtn.setEffect(makeSoftShadow());
+
+            HBox sendRow = new HBox(sendBtn);
+            sendRow.setAlignment(Pos.CENTER_RIGHT);
+            inputCard.getChildren().addAll(inputLabel, inputArea, sendRow);
+
+            summarizeBtn.setStyle(getActionButtonStyle());
+            keyPointsBtn.setStyle(getActionButtonStyle());
+            flashcardsBtn.setStyle(getActionButtonStyle());
+
+            HBox buttonRow = new HBox(16, summarizeBtn, keyPointsBtn, flashcardsBtn);
+            buttonRow.setAlignment(Pos.CENTER);
+            buttonRow.setPadding(new Insets(10, 0, 10, 0));
+
+            progressIndicator.setVisible(false);
+            progressIndicator.setMaxSize(50, 50);
+
+            VBox outputCard = new VBox(12);
+            outputCard.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-padding: 20; " +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+            outputCard.setMaxWidth(900);
+
+            javafx.scene.control.Label outputLabel = new javafx.scene.control.Label("AI Response:");
+            outputLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #25324B;");
+
+            outputArea.setEditable(false);
+            outputArea.setWrapText(true);
+            outputArea.setPrefRowCount(10);
+            outputArea.setStyle("-fx-font-size: 13px; -fx-background-color: #f8f9fa; " +
+                    "-fx-border-color: #e0e0e0; -fx-border-radius: 8; -fx-background-radius: 8;");
+
+            outputCard.getChildren().addAll(outputLabel, outputArea);
+
+            sendToTypingBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; " +
+                    "-fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 12 24; -fx-background-radius: 20;");
+            sendToTypingBtn.setEffect(makeSoftShadow());
+            sendToTypingBtn.setDisable(true);
+
+            HBox sendToTypingBox = new HBox(sendToTypingBtn);
+            sendToTypingBox.setAlignment(Pos.CENTER);
+            sendToTypingBox.setPadding(new Insets(10, 0, 0, 0));
+
+            getChildren().addAll(title, inputCard, buttonRow, progressIndicator, outputCard, sendToTypingBox);
+
+            sendBtn.setOnAction(e -> processWithAI(""));
+            inputArea.setOnKeyPressed(e -> {
+                if (e.getCode() == javafx.scene.input.KeyCode.ENTER && e.isControlDown()) processWithAI("");
+            });
+            summarizeBtn.setOnAction(e -> processWithAI("Summarize the following text concisely:\n\n"));
+            keyPointsBtn.setOnAction(e -> processWithAI("Extract and list the key points from the following text:\n\n"));
+            flashcardsBtn.setOnAction(e -> processWithAI("Generate 5 flashcard question-answer pairs from this text. Format each as 'Q: [question]\nA: [answer]'\n\n"));
+            sendToTypingBtn.setOnAction(e -> {
+                String text = outputArea.getText();
+                if (text != null && !text.trim().isEmpty() && onSendToTyping != null) {
+                    onSendToTyping.accept(text);
+                }
+            });
+
+            if (initialPrompt != null && !initialPrompt.trim().isEmpty()) {
+                inputArea.setText(initialPrompt);
+                processWithAI("");
+            }
+        }
+
+        private String getActionButtonStyle() {
+            return "-fx-background-color: white; -fx-text-fill: #25324B; -fx-font-weight: bold; -fx-font-size: 13px; " +
+                    "-fx-padding: 10 20; -fx-background-radius: 18; -fx-border-color: #f1c77f; -fx-border-width: 2; -fx-border-radius: 18;";
+        }
+
+        private javafx.scene.effect.DropShadow makeSoftShadow() {
+            javafx.scene.effect.DropShadow shadow = new javafx.scene.effect.DropShadow();
+            shadow.setColor(javafx.scene.paint.Color.rgb(27, 43, 77, 0.15));
+            shadow.setRadius(8);
+            shadow.setSpread(0.2);
+            shadow.setOffsetY(3);
+            return shadow;
+        }
+
+        private void processWithAI(String promptPrefix) {
+            String userText = inputArea.getText();
+            if (userText == null || userText.trim().isEmpty()) {
+                outputArea.setText("Please enter some text or ask a question first!");
+                return;
+            }
+
+            sendBtn.setDisable(true);
+            summarizeBtn.setDisable(true);
+            keyPointsBtn.setDisable(true);
+            flashcardsBtn.setDisable(true);
+            sendToTypingBtn.setDisable(true);
+            progressIndicator.setVisible(true);
+            outputArea.setText("Thinking...");
+
+            new Thread(() -> {
+                try {
+                    String prompt = promptPrefix.isEmpty()
+                            ? "You are a helpful study assistant. Answer the following question or respond to the following request concisely and clearly:\n\n" + userText
+                            : promptPrefix + userText;
+
+                    String response = gemini.askGemini(prompt);
+
+                    javafx.application.Platform.runLater(() -> {
+                        outputArea.setText(response);
+                        sendBtn.setDisable(false);
+                        summarizeBtn.setDisable(false);
+                        keyPointsBtn.setDisable(false);
+                        flashcardsBtn.setDisable(false);
+                        sendToTypingBtn.setDisable(false);
+                        progressIndicator.setVisible(false);
+                    });
+                } catch (Exception ex) {
+                    javafx.application.Platform.runLater(() -> {
+                        outputArea.setText("Error: " + ex.getMessage());
+                        sendBtn.setDisable(false);
+                        summarizeBtn.setDisable(false);
+                        keyPointsBtn.setDisable(false);
+                        flashcardsBtn.setDisable(false);
+                        progressIndicator.setVisible(false);
+                    });
+                }
+            }).start();
+        }
+    }
+
+    // ===== STYLING =====
     private static final class Style {
         private static javafx.scene.effect.DropShadow softShadow() {
             javafx.scene.effect.DropShadow ds = new javafx.scene.effect.DropShadow();
@@ -335,6 +691,7 @@ public class StudyMateApp extends Application {
             ds.setOffsetY(6);
             return ds;
         }
+
         static Button pill(String text) {
             Button b = new Button(text);
             b.setTextFill(javafx.scene.paint.Color.web("#25324B"));
@@ -347,6 +704,7 @@ public class StudyMateApp extends Application {
             b.setEffect(softShadow());
             return b;
         }
+
         static javafx.scene.layout.Region underline() {
             javafx.scene.layout.Region r = new javafx.scene.layout.Region();
             r.setMinHeight(6);
@@ -360,6 +718,7 @@ public class StudyMateApp extends Application {
             r.setEffect(softShadow());
             return r;
         }
+
         static StackPane circleCTA(String text) {
             StackPane p = new StackPane();
             p.setPrefSize(340, 340);
@@ -376,6 +735,7 @@ public class StudyMateApp extends Application {
             p.getChildren().add(lbl);
             return p;
         }
+
         static void roundTextField(TextField tf) {
             tf.setBackground(new javafx.scene.layout.Background(new javafx.scene.layout.BackgroundFill(
                     javafx.scene.paint.Color.WHITE, new javafx.scene.layout.CornerRadii(999), Insets.EMPTY)));
@@ -386,6 +746,7 @@ public class StudyMateApp extends Application {
             tf.setPadding(new Insets(14,20,14,20));
             tf.setEffect(softShadow());
         }
+
         static Button primary(String text) {
             Button b = new Button(text);
             b.setTextFill(javafx.scene.paint.Color.web("#25324B"));
