@@ -13,14 +13,14 @@ import java.util.function.Consumer;
 
 /**
  * TypingHomeView shows two centered buttons to choose a sub-module:
- *  - Typing Practice
+ *  - Typing Race
  *  - Typing Exercise
  *
  * The parent (StudyMateApp) can observe the choice via setOnChoice.
  */
 public class TypingHomeView extends BorderPane {
 
-    public enum Choice { PRACTICE, EXERCISE }
+    public enum Choice { RACE, EXERCISE }
 
     private Consumer<Choice> onChoice;
 
@@ -34,7 +34,7 @@ public class TypingHomeView extends BorderPane {
         BorderPane.setAlignment(title, Pos.CENTER);
 
         // Buttons
-        Button practiceBtn = new Button("Typing Practice");
+        Button practiceBtn = new Button("Typing Race");
         Button exerciseBtn = new Button("Typing Exercise");
         practiceBtn.setPrefWidth(220);
         exerciseBtn.setPrefWidth(220);
@@ -44,7 +44,7 @@ public class TypingHomeView extends BorderPane {
         setCenter(center);
 
         // Events
-        practiceBtn.setOnAction(e -> fire(Choice.PRACTICE));
+        practiceBtn.setOnAction(e -> fire(Choice.RACE));
         exerciseBtn.setOnAction(e -> fire(Choice.EXERCISE));
     }
 

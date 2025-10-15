@@ -6,25 +6,22 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
+import javafx.scene.text.*;
 import javafx.util.Duration;
 import javafx.scene.paint.Color;
 import ui.TextLibrary;
 
-public class TypingExerciseView extends BorderPane {
+public class TypingRaceView extends BorderPane {
 
     // Header
     private final Button backBtn = new Button("Back");
-    private final Label heading = new Label("Typing Exercise");
+    private final Label heading = new Label("Typing Race");
     private final Label timerLabel = new Label("00:00");
 
     // Body
-    private final TextFlow targetFlow = new TextFlow();
+    private final TextFlow userFlow = new TextFlow();
+    private final TextFlow aiFlow = new TextFlow();
     private final TextArea inputArea = new TextArea();
-    private final Button nextBtn = new Button("Next");
 
     // Footer
     private final Label stats = new Label("");
@@ -37,7 +34,13 @@ public class TypingExerciseView extends BorderPane {
     private boolean exerciseStarted = false;
     private int mistakesCount = 0;
 
-    public TypingExerciseView() {
+    // AI settings
+    private double aiWPM = 20;      // low difficulty
+    private double aiAccuracy = 90; // % of chars correct
+    private int aiIndex = 0;
+    private Timeline aiClock;
+
+    public TypingRaceView() {
         setPadding(new Insets(10));
 
         // ===== Top bar =====
@@ -52,13 +55,15 @@ public class TypingExerciseView extends BorderPane {
         BorderPane.setMargin(top, new Insets(0, 0, 10, 0));
 
         // ===== Center =====
-        targetFlow.setPrefWidth(800);
-        inputArea.setWrapText(true);
-        inputArea.setPrefRowCount(6);
-        inputArea.setPrefHeight(160);
+        userFlow.setPrefWidth(800);
+        aiFlow.setPrefWidth(800);
 
-        HBox actions = new HBox(8, nextBtn);
-        VBox center = new VBox(10, targetFlow, inputArea, actions);
+        inputArea.setWrapText(true);
+        inputArea.setPrefRowCount(5);
+        inputArea.setPrefHeight(120);
+
+        VBox center = new VBox(10, new Label("Your progress:"), userFlow,
+                new Label("AI progress:"), aiFlow, inputArea);
         setCenter(center);
 
         // ===== Bottom =====
@@ -68,7 +73,6 @@ public class TypingExerciseView extends BorderPane {
 
         // Wiring
         backBtn.setOnAction(e -> { if (onBack != null) onBack.run(); });
-        nextBtn.setOnAction(e -> prepareRound());
 
         // Live typing listener
         inputArea.textProperty().addListener((obs, oldValue, newValue) -> {
@@ -77,17 +81,15 @@ public class TypingExerciseView extends BorderPane {
                 exerciseStarted = true;
             }
 
-            // Count new mistakes as the user types
+            // Count mistakes
             int pos = newValue.length() - 1;
             if (pos >= 0 && pos < target.length()) {
                 char typedChar = newValue.charAt(pos);
                 char targetChar = target.charAt(pos);
-                if (typedChar != targetChar) {
-                    mistakesCount++;
-                }
+                if (typedChar != targetChar) mistakesCount++;
             }
 
-            highlight(newValue);
+            highlightPlayer(newValue);
             updateStats(newValue);
 
             if (newValue.equals(target)) {
@@ -99,25 +101,34 @@ public class TypingExerciseView extends BorderPane {
         clock = new Timeline(new KeyFrame(Duration.seconds(1), e -> tick()));
         clock.setCycleCount(Timeline.INDEFINITE);
 
-        // Initial state
+        // AI Timer
+        double aiIntervalSec = 60.0 / (aiWPM * 5.0); // time per char
+        aiClock = new Timeline(new KeyFrame(Duration.seconds(aiIntervalSec), e -> updateAI()));
+        aiClock.setCycleCount(Timeline.INDEFINITE);
+
         prepareRound();
     }
 
     public void setOnBack(Runnable r) { this.onBack = r; }
 
     private void prepareRound() {
-        target = buildParagraph();
-        renderTarget("", 0);
+        target = TextLibrary.getRandomText();
+        userFlow.getChildren().clear();
+        aiFlow.getChildren().clear();
         inputArea.clear();
         inputArea.setDisable(false);
         exerciseStarted = false;
         mistakesCount = 0;
+        aiIndex = 0;
 
-        nextBtn.setDisable(false);
-        stats.setText("");
         elapsedSec = 0;
         timerLabel.setText("00:00");
+        stats.setText("");
+
         clock.stop();
+        aiClock.stop();
+        highlightPlayer("");
+        renderAI("");
     }
 
     private void startExercise() {
@@ -126,10 +137,14 @@ public class TypingExerciseView extends BorderPane {
         clock.playFromStart();
         inputArea.setDisable(false);
         inputArea.requestFocus();
+
+        aiIndex = 0;
+        aiClock.playFromStart();
     }
 
     private void finishExercise() {
         clock.stop();
+        aiClock.stop();
         inputArea.setDisable(true);
         updateStats(inputArea.getText());
     }
@@ -143,7 +158,7 @@ public class TypingExerciseView extends BorderPane {
     }
 
     private void updateStats(String typed) {
-        double minutes = Math.max(1.0 / 60.0, elapsedSec / 60.0); // min 1 second
+        double minutes = Math.max(1.0 / 60.0, elapsedSec / 60.0); // min 1 sec
         int correctChars = Math.min(typed.length(), target.length()) - mistakesCount;
         if (correctChars < 0) correctChars = 0;
 
@@ -154,17 +169,18 @@ public class TypingExerciseView extends BorderPane {
                 timerLabel.getText(), wpm, accuracy));
     }
 
-    private void highlight(String typed) {
-        int firstMismatch = firstMismatchIndex(typed, target);
-        renderTarget(typed, firstMismatch);
+    // ===== User highlighting =====
+    private void highlightPlayer(String typed) {
+        renderTextFlow(userFlow, typed);
     }
 
-    private void renderTarget(String typed, int firstMismatch) {
-        targetFlow.getChildren().clear();
+    private void renderTextFlow(TextFlow flow, String typed) {
+        flow.getChildren().clear();
         if (typed == null) typed = "";
 
         int typedLen = typed.length();
         int tgtLen = target.length();
+        int firstMismatch = firstMismatchIndex(typed, target);
         int correctEnd = Math.min(firstMismatch, tgtLen);
         int mismatchEnd = Math.min(typedLen, tgtLen);
 
@@ -172,21 +188,40 @@ public class TypingExerciseView extends BorderPane {
             Text ok = new Text(target.substring(0, correctEnd));
             ok.setFill(Color.web("#32CD32"));
             ok.setFont(Font.font(16));
-            targetFlow.getChildren().add(ok);
+            flow.getChildren().add(ok);
         }
         if (mismatchEnd > correctEnd) {
             Text wrong = new Text(target.substring(correctEnd, mismatchEnd));
             wrong.setFill(Color.CRIMSON);
             wrong.setUnderline(true);
             wrong.setFont(Font.font(16));
-            targetFlow.getChildren().add(wrong);
+            flow.getChildren().add(wrong);
         }
         if (tgtLen > mismatchEnd) {
             Text rest = new Text(target.substring(mismatchEnd));
             rest.setFill(Color.GRAY);
             rest.setFont(Font.font(16));
-            targetFlow.getChildren().add(rest);
+            flow.getChildren().add(rest);
         }
+    }
+
+    // ===== AI =====
+    private void updateAI() {
+        if (aiIndex >= target.length()) {
+            aiClock.stop();
+            return;
+        }
+
+        // Determine if AI makes mistake
+        char c = target.charAt(aiIndex);
+        boolean mistake = Math.random() > aiAccuracy / 100.0;
+        String typedChar = mistake ? "_" : String.valueOf(c); // underscore for error
+        aiIndex++;
+        renderAI(target.substring(0, aiIndex - (mistake ? 1 : 0)) + typedChar);
+    }
+
+    private void renderAI(String typed) {
+        renderTextFlow(aiFlow, typed);
     }
 
     private static int firstMismatchIndex(String typed, String target) {
@@ -194,9 +229,5 @@ public class TypingExerciseView extends BorderPane {
         int max = Math.min(typed.length(), target.length());
         while (i < max && typed.charAt(i) == target.charAt(i)) i++;
         return i;
-    }
-
-    private static String buildParagraph() {
-        return TextLibrary.getRandomText();
     }
 }

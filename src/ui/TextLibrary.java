@@ -19,12 +19,38 @@ public class TextLibrary {
 
     // ===== Legacy sample texts (kept for backward compatibility) =====
     private static final String[] TEXTS = {
-            "The quick brown fox jumps over the lazy dog.",
-            "A journey of a thousand miles begins with a single step.",
-            "Practice makes perfect. Keep pushing forward, even when it's tough.",
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness...",
-            "Life is a storm, my young friend. You will bask in the sunlight one moment, be shattered on the rocks the next. What makes you a man is what you do when that storm comes. You must look into that storm and shout as you did in Rome. Do your worst, for I will do mine! Then the fates will know you as we know you."
+            // Existing Bible passage
+            "\"We are not stoning you for any good work,\" they replied, " +
+                    "\"but for blasphemy, because you, a mere man, claim to be God.\" " +
+                    "Jesus answered them, \"Is it not written in your Law, 'I have said you are gods'? " +
+                    "If he called them 'gods,' to whom the word of God came--and Scripture cannot be set aside-- " +
+                    "what about the one whom the Father set apart as his very own and sent into the world? " +
+                    "Why then do you accuse me of blasphemy because I said, 'I am God's Son'? " +
+                    "Do not believe me unless I do the works of my Father. But if I do them, " +
+                    "even though you do not believe me, believe the works, that you may know and understand " +
+                    "that the Father is in me, and I in the Father.\"," ,
+
+            // New text addition
+            "Life is a storm, my young friend. You will bask in the sunlight one moment, " +
+                    "be shattered on the rocks the next. What makes you a man is what you do when that storm comes.",
+
+            // Existing sample texts
+            "The quick brown fox jumps over the lazy dog. " +
+                    "This sentence contains every letter of the English alphabet and is often used to test typing skills and fonts.",
+
+            "In a hole in the ground there lived a hobbit. " +
+                    "Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell, " +
+                    "nor yet a dry, bare, sandy hole with nothing in it to sit down on or to eat: it was a hobbit-hole, and that means comfort.",
+
+            "It was the best of times, it was the worst of times, " +
+                    "it was the age of wisdom, it was the age of foolishness, " +
+                    "it was the epoch of belief, it was the epoch of incredulity, " +
+                    "it was the season of Light, it was the season of Darkness, " +
+                    "it was the spring of hope, it was the winter of despair.",
+
+            "To be, or not to be, that is the question: " +
+                    "Whether 'tis nobler in the mind to suffer the slings and arrows of outrageous fortune, " +
+                    "or to take arms against a sea of troubles, and by opposing end them."
     };
 
     public static String getRandomText() {
