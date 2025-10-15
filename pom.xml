@@ -7,6 +7,8 @@
     <groupId>com.studymate</groupId>
     <artifactId>StudyMate</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <!-- No modules: single-project setup -->
 
     <!-- Make sure Maven compiles with Java 21 -->
     <properties>
@@ -69,7 +71,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>ui.Main</mainClass>
+                    <mainClass>ui.StudyMateApp</mainClass>
                     <launcher>StudyMate</launcher>
                     <jlinkZipName>studymate</jlinkZipName>
                     <stripManifest>true</stripManifest>

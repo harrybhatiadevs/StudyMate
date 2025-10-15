@@ -10,7 +10,7 @@ public class FlashcardDAO {
         this.jdbcUrl = jdbcUrl; // Example: "jdbc:sqlite:studymate.db"
     }
 
-    /** Initialize the database (create table if not exists). */
+    /** Initialise the database (create table if not exists). */
     public void init() throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl);
              Statement st = conn.createStatement()) {
