@@ -57,13 +57,7 @@ public class ChatView extends BorderPane {
 
         addUserMessage(p);
         addAiTyping();
-        new Thread(() -> {
-            try { Thread.sleep(800); } catch (InterruptedException ignored) {}
-            Platform.runLater(() -> {
-                removeAiTyping();
-                addAiMessage("You said: " + p);
-            });
-        }).start();
+        generateAiAsync(p);
     }
 
     private void sendMessage() {
@@ -74,14 +68,7 @@ public class ChatView extends BorderPane {
         inputField.clear();
 
         addAiTyping();
-
-        new Thread(() -> {
-            try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-            Platform.runLater(() -> {
-                removeAiTyping();
-                addAiMessage("You said: " + text);
-            });
-        }).start();
+        generateAiAsync(text);
     }
 
     private void addUserMessage(String text) {
@@ -103,6 +90,32 @@ public class ChatView extends BorderPane {
     }
     private void removeAiTyping() {
         chatBox.getChildren().remove(typingBubble);
+    }
+
+    /** Runs the AI call off the FX thread and posts the reply. */
+    private void generateAiAsync(String prompt) {
+        new Thread(() -> {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {}
+            Platform.runLater(() -> {
+                removeAiTyping();
+                addAiMessage(mockReply(prompt));
+            });
+        }, "local-ai-mock").start();
+    }
+
+
+    private String mockReply(String userText) {
+        if (userText == null || userText.isBlank()) return "How can I help?";
+        String t = userText.trim();
+        if (t.endsWith("?")) {
+            return "Great question! Here's a quick take on: \"" + t + "\"";
+        }
+        if (t.length() < 6) {
+            return "Got it — tell me more.";
+        }
+        return "Thanks! I read: \"" + t + "\".\nWant me to summarise, explain, make flashcards, or quiz you?";
     }
 
     // Utility: create a rounded "bubble" box

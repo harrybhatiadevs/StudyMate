@@ -32,13 +32,6 @@
             <version>2.11.0</version>
         </dependency>
 
-        <!-- Gemani Dependancy -->
-        <dependency>
-            <groupId>com.google.genai</groupId>
-            <artifactId>google-genai</artifactId>
-            <version>1.16.0</version>
-        </dependency>
-
         <!-- JavaFX Dependancy -->
         <dependency>
             <groupId>org.openjfx</groupId>
