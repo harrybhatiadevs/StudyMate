@@ -12,10 +12,20 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+// === Account imports (ADDED) ===
+import model.User;
+import model.UserDAO;
+import ui.views.AuthDialog;
+import ui.views.ProfileView;
+
 public class StudyMateApp extends Application {
     private BorderPane root;
     private SidebarFX sidebar;
     private GeminiClient geminiClient;
+
+    // === Account fields (ADDED) ===
+    private UserDAO userDAO;
+    private ProfileView profileView;
 
     public static void main(String[] args) {
         launch(args);
@@ -36,6 +46,12 @@ public class StudyMateApp extends Application {
             System.out.println("GOOGLE_API_KEY not found - AI features will be disabled");
         }
 
+        // === Account init (ADDED) ===
+        String userDbUrl = buildUserDbUrl();  // use same db folder as flashcards: ~/StudyMate/studymate.db
+        userDAO = new UserDAO(userDbUrl);
+        profileView = new ProfileView();
+        profileView.setUserDAO(userDAO);
+
         root = new BorderPane();
 
         // Top bar with Home button
@@ -53,6 +69,18 @@ public class StudyMateApp extends Application {
             switch (target) {
                 case CHAT -> showAISummary();
                 case PROJECTS -> System.out.println("Projects clicked - not implemented yet");
+
+                // === open login/profile (ADDED) ===
+                case OTHERS -> openAccount();
+
+                // === handle logout (ADDED) ===
+                case LOGOUT -> {
+                    Session.logout();
+                    try { sidebar.refreshAccountLabel(); } catch (Throwable ignored) {}
+                    System.out.println("Logged out.");
+                    showHome();
+                }
+
                 default -> System.out.println("Navigation: " + target);
             }
         });
@@ -63,6 +91,23 @@ public class StudyMateApp extends Application {
         stage.setScene(scene);
         stage.show();
         showHome();
+    }
+
+    // === Account: open login/profile (ADDED) ===
+    private void openAccount() {
+        if (!Session.isLoggedIn()) {
+            AuthDialog dialog = new AuthDialog(userDAO);
+            dialog.onSuccess((User u) -> {
+                Session.login(u);
+                profileView.refresh(u);
+                try { sidebar.refreshAccountLabel(); } catch (Throwable ignored) {}
+                root.setCenter(profileView);
+            });
+            dialog.show();
+        } else {
+            profileView.refresh(Session.getCurrentUser());
+            root.setCenter(profileView);
+        }
     }
 
     private void showHome() {
@@ -329,7 +374,6 @@ public class StudyMateApp extends Application {
             System.out.println("Sample text: " + sample);
             System.out.println("Sample length: " + sample.length());
 
-            // Title and Reset Button Row
             javafx.scene.control.Label title = new javafx.scene.control.Label("Typing Practice");
             title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #1a1f36;");
 
@@ -339,7 +383,6 @@ public class StudyMateApp extends Application {
                     "-fx-border-color: transparent; -fx-border-width: 0;");
             resetBtn.setEffect(createShadow(0.12));
 
-            // Hover effect for reset button
             resetBtn.setOnMouseEntered(e -> resetBtn.setStyle(
                     "-fx-background-color: linear-gradient(to bottom, #ffeb99, #ffd966); " +
                             "-fx-text-fill: #25324B; -fx-font-weight: 600; -fx-font-size: 14px; " +
@@ -352,18 +395,15 @@ public class StudyMateApp extends Application {
             HBox topBar = new HBox(24, title, resetBtn);
             topBar.setAlignment(Pos.CENTER);
 
-            // Main card container
             VBox card = new VBox(20);
             card.setStyle("-fx-background-color: white; -fx-background-radius: 16; -fx-padding: 32; " +
                     "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 16, 0, 0, 4);");
             card.setMaxWidth(950);
             card.setAlignment(Pos.CENTER);
 
-            // Instructions with icon
             javafx.scene.control.Label instructions = new javafx.scene.control.Label("📝 Type the text below as accurately as possible:");
             instructions.setStyle("-fx-font-size: 15px; -fx-text-fill: #64748b; -fx-font-weight: 500;");
 
-            // Reference text box (ghost text)
             VBox ghostBox = new VBox(8);
             ghostBox.setStyle("-fx-background-color: #fef3c7; -fx-border-color: #fbbf24; " +
                     "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12; " +
@@ -382,11 +422,9 @@ public class StudyMateApp extends Application {
 
             ghostBox.getChildren().addAll(ghostTitle, ghostLabel);
 
-            // Spacing between boxes
             javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
             spacer.setPrefHeight(12);
 
-            // Your typing box
             VBox inputBox = new VBox(8);
             inputBox.setStyle("-fx-background-color: #f8fafc; -fx-border-color: #10b981; " +
                     "-fx-border-width: 2; -fx-border-radius: 12; -fx-background-radius: 12; " +
@@ -410,13 +448,11 @@ public class StudyMateApp extends Application {
 
             inputBox.getChildren().addAll(inputTitle, input);
 
-            // Progress bar with modern styling
             progressBar.setMaxWidth(880);
             progressBar.setPrefHeight(8);
             progressBar.setStyle("-fx-accent: linear-gradient(to right, #10b981, #059669); " +
                     "-fx-background-color: #e5e7eb; -fx-background-radius: 4; -fx-padding: 0;");
 
-            // Stats display with better layout
             HBox statsBox = new HBox(16);
             statsBox.setAlignment(Pos.CENTER);
             statsBox.setStyle("-fx-background-color: #f1f5f9; -fx-padding: 16 24; " +
@@ -425,11 +461,9 @@ public class StudyMateApp extends Application {
             stats.setStyle("-fx-font-size: 15px; -fx-font-weight: 600; -fx-text-fill: #334155;");
             statsBox.getChildren().add(stats);
 
-            // Add all elements to card
             card.getChildren().addAll(instructions, ghostBox, spacer, inputBox, progressBar, statsBox);
             getChildren().addAll(topBar, card);
 
-            // Event handlers
             input.textProperty().addListener((obs, oldV, newV) -> {
                 if (startTs == 0L && !newV.isBlank()) startTs = System.currentTimeMillis();
                 updateDisplay(newV);
@@ -642,10 +676,10 @@ public class StudyMateApp extends Application {
                 return;
             }
 
-            sendBtn.setDisable(true);
             summarizeBtn.setDisable(true);
             keyPointsBtn.setDisable(true);
             flashcardsBtn.setDisable(true);
+            sendBtn.setDisable(true);
             sendToTypingBtn.setDisable(true);
             progressIndicator.setVisible(true);
             outputArea.setText("Thinking...");
@@ -660,20 +694,20 @@ public class StudyMateApp extends Application {
 
                     javafx.application.Platform.runLater(() -> {
                         outputArea.setText(response);
-                        sendBtn.setDisable(false);
                         summarizeBtn.setDisable(false);
                         keyPointsBtn.setDisable(false);
                         flashcardsBtn.setDisable(false);
+                        sendBtn.setDisable(false);
                         sendToTypingBtn.setDisable(false);
                         progressIndicator.setVisible(false);
                     });
                 } catch (Exception ex) {
                     javafx.application.Platform.runLater(() -> {
                         outputArea.setText("Error: " + ex.getMessage());
-                        sendBtn.setDisable(false);
                         summarizeBtn.setDisable(false);
                         keyPointsBtn.setDisable(false);
                         flashcardsBtn.setDisable(false);
+                        sendBtn.setDisable(false);
                         progressIndicator.setVisible(false);
                     });
                 }
@@ -759,5 +793,13 @@ public class StudyMateApp extends Application {
             b.setEffect(softShadow());
             return b;
         }
+    }
+
+    // === helper: build user db url (ADDED) ===
+    private String buildUserDbUrl() {
+        String home = System.getProperty("user.home");
+        java.nio.file.Path dir = java.nio.file.Paths.get(home, "StudyMate");
+        try { java.nio.file.Files.createDirectories(dir); } catch (java.io.IOException ignored) {}
+        return "jdbc:sqlite:" + dir.resolve("studymate.db").toAbsolutePath();
     }
 }

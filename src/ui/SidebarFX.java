@@ -3,8 +3,8 @@ package ui;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -13,9 +13,13 @@ import java.util.function.Consumer;
 
 public class SidebarFX extends VBox {
 
-    public enum Target { CHAT, PROJECTS, TEMPLATES, TYPING, OTHERS }
+    // Added LOGOUT here to route logout action back to StudyMateApp
+    public enum Target { CHAT, PROJECTS, TEMPLATES, TYPING, OTHERS, LOGOUT }
 
     private Consumer<Target> onNavigate;
+
+    // keep a reference so we can refresh the label after login/logout
+    private Button accountBtn;
 
     public SidebarFX() {
         setSpacing(8);
@@ -33,16 +37,80 @@ public class SidebarFX extends VBox {
         styleNavButton(chatBtn);
         styleNavButton(projectsBtn);
 
-
         chatBtn.setOnAction(e -> navigate(Target.CHAT));
         projectsBtn.setOnAction(e -> navigate(Target.PROJECTS));
-
 
         VBox spacer = new VBox();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        getChildren().addAll(chatBtn, projectsBtn, spacer);
+        // --- bottom Account button (uses same styling) ---
+        accountBtn = fullButton(buildAccountLabel());
+        styleNavButton(accountBtn);
+
+        // Behavior:
+        // - Not logged in: navigate to OTHERS (open Auth dialog)
+        // - Logged in: show a small menu: Profile / Logout
+        accountBtn.setOnAction(e -> {
+            if (isLoggedInSafe()) {
+                ContextMenu menu = new ContextMenu();
+
+                MenuItem profile = new MenuItem("Profile");
+                profile.setOnAction(ev -> navigate(Target.OTHERS));
+
+                MenuItem logout = new MenuItem("Logout");
+                logout.setOnAction(ev -> navigate(Target.LOGOUT));
+
+                menu.getItems().addAll(profile, logout);
+                menu.show(accountBtn, javafx.geometry.Side.TOP, 0, 0);
+            } else {
+                navigate(Target.OTHERS);
+            }
+        });
+
+        getChildren().addAll(chatBtn, projectsBtn, spacer, accountBtn);
         setAlignment(Pos.TOP_CENTER);
+    }
+
+    /** Public helper: call this after login/logout to update "Account (...)" text. */
+    public void refreshAccountLabel() {
+        if (accountBtn != null) {
+            accountBtn.setText(buildAccountLabel());
+        }
+    }
+
+    private boolean isLoggedInSafe() {
+        try {
+            // Common static API
+            return ui.Session.isLoggedIn() && ui.Session.getCurrentUser() != null;
+        } catch (Throwable ignore) {
+            // if you ever switch to a singleton Session, this fallback avoids crashes at runtime
+            try {
+                Object s = ui.Session.class.getMethod("get").invoke(null);
+                Object u = s.getClass().getMethod("currentUser").invoke(s);
+                return u != null;
+            } catch (Throwable t) { return false; }
+        }
+    }
+
+    private String buildAccountLabel() {
+        try {
+            if (ui.Session.isLoggedIn() && ui.Session.getCurrentUser() != null) {
+                String name = ui.Session.getCurrentUser().getUsername();
+                if (name == null || name.isBlank()) name = "User";
+                return "Account (" + name + ")";
+            }
+        } catch (Throwable ignore) {
+            try {
+                Object s = ui.Session.class.getMethod("get").invoke(null);
+                Object u = s.getClass().getMethod("currentUser").invoke(s);
+                if (u != null) {
+                    String name = (String) u.getClass().getMethod("getUsername").invoke(u);
+                    if (name == null || name.isBlank()) name = "User";
+                    return "Account (" + name + ")";
+                }
+            } catch (Throwable ignored) {}
+        }
+        return "Account";
     }
 
     private Button fullButton(String text) {

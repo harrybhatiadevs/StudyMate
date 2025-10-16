@@ -1,112 +1,98 @@
 package ui.views;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import model.User;
 import model.UserDAO;
 import ui.Session;
 
-public class ProfileView extends VBox {
-    private final UserDAO dao;
-    private final Label emailLabel = new Label();
+public class ProfileView extends BorderPane {
+    private final Label emailLabel = new Label("-");
+    private final Label createdAtLabel = new Label("-");
     private final TextField usernameField = new TextField();
+    private final PasswordField newPasswordField = new PasswordField();
+    private final PasswordField confirmPasswordField = new PasswordField();
+    private final Label msg = new Label();
 
-    public ProfileView(UserDAO dao) {
-        this.dao = dao;
-        setPadding(new Insets(16));
-        setSpacing(14);
+    private UserDAO userDAO;
+
+    public ProfileView() {
+        setPadding(new Insets(24));
+        msg.setStyle("-fx-text-fill:#d33;");
+        setCenter(buildCard());
+    }
+
+    public void setUserDAO(UserDAO userDAO) { this.userDAO = userDAO; }
+
+    private Region buildCard() {
+        VBox card = new VBox(14);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setPadding(new Insets(24));
+        card.setStyle("""
+            -fx-background-color: rgba(255,255,255,0.95);
+            -fx-background-radius: 18;
+            -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.10), 14, 0, 0, 8);
+            """);
 
         Label title = new Label("Profile");
-        title.setStyle("-fx-font-size:18px; -fx-font-weight:bold;");
+        title.setStyle("-fx-font-size:20px; -fx-font-weight:bold;");
 
-        // Username + Email (email read-only)
-        GridPane base = new GridPane();
-        base.setHgap(10); base.setVgap(10);
-        base.add(new Label("Username:"), 0, 0);
-        base.add(usernameField, 1, 0);
-        base.add(new Label("Email:"), 0, 1);
-        base.add(emailLabel, 1, 1);
-
+        usernameField.setPromptText("Username");
         Button saveUsername = new Button("Save Username");
-        saveUsername.setOnAction(e -> onSaveUsername());
+        saveUsername.setOnAction(e -> handleSaveUsername());
 
-        // Change password block
-        PasswordField oldPwd = new PasswordField();
-        PasswordField newPwd = new PasswordField();
-        PasswordField newConfirm = new PasswordField();
-        oldPwd.setPromptText("Old password");
-        newPwd.setPromptText("New password (min 6 chars)");
-        newConfirm.setPromptText("Confirm new password");
-
+        newPasswordField.setPromptText("New Password (>=6, letters & digits)");
+        confirmPasswordField.setPromptText("Confirm New Password");
         Button changePwd = new Button("Change Password");
-        Label msg = new Label();
+        changePwd.setOnAction(e -> handleChangePassword());
 
-        changePwd.setOnAction(e -> {
-            try {
-                User u = Session.get().currentUser();
-                if (u == null) { msg.setText("Not signed in."); return; }
-                if (newPwd.getText().isBlank() || newConfirm.getText().isBlank()) {
-                    msg.setText("Please fill all password fields.");
-                    return;
-                }
-                if (!newPwd.getText().equals(newConfirm.getText())) {
-                    msg.setText("Passwords do not match.");
-                    return;
-                }
-                if (newPwd.getText().length() < 6) {
-                    msg.setText("New password must be at least 6 characters.");
-                    return;
-                }
-                boolean ok = dao.changePassword(u.getId(), oldPwd.getText(), newPwd.getText());
-                msg.setText(ok ? "Password updated." : "Old password incorrect.");
-                oldPwd.clear(); newPwd.clear(); newConfirm.clear();
-            } catch (Exception ex) {
-                msg.setText("Error: " + ex.getMessage());
-            }
-        });
+        GridPane g = new GridPane(); g.setHgap(12); g.setVgap(10);
+        int r=0;
+        g.add(bold("Email:"), 0, r);   g.add(emailLabel, 1, r++);
+        g.add(bold("Joined:"),0, r);   g.add(createdAtLabel, 1, r++);
+        g.add(bold("Username:"),0,r);  g.add(usernameField,1,r); g.add(saveUsername,2,r++);
+        g.add(bold("New Password:"),0,r); g.add(newPasswordField,1,r++);
+        g.add(bold("Confirm Password:"),0,r); g.add(confirmPasswordField,1,r); g.add(changePwd,2,r++);
 
-        Button logout = new Button("Log out");
-        logout.setOnAction(e -> Session.get().logout());
-
-        HBox actions = new HBox(10, saveUsername, logout);
-
-        getChildren().addAll(title, base, actions,
-                new Separator(),
-                new Label("Change Password"),
-                oldPwd, newPwd, newConfirm, changePwd, msg);
-
-        // Load current user
-        loadFromSession();
-        Session.get().onChange(u -> loadFromSession());
+        card.getChildren().addAll(title, g, msg);
+        return card;
     }
 
-    private void loadFromSession() {
-        User u = Session.get().currentUser();
-        if (u == null) {
-            usernameField.setText("");
-            emailLabel.setText("(not signed in)");
-            setDisable(true);
-        } else {
-            setDisable(false);
-            usernameField.setText(u.getUsername());
-            emailLabel.setText(u.getEmail());
+    private Label bold(String s){ Label l=new Label(s); l.setStyle("-fx-font-weight:bold;"); return l; }
+
+    public void refresh(User user) {
+        msg.setText("");
+        if (user == null) {
+            emailLabel.setText("-"); createdAtLabel.setText("-");
+            usernameField.setText(""); newPasswordField.clear(); confirmPasswordField.clear();
+            return;
         }
+        emailLabel.setText(user.getEmail());
+        createdAtLabel.setText(user.getCreatedAt()==null ? "-" : user.getCreatedAt().toString());
+        usernameField.setText(user.getUsername()==null ? "" : user.getUsername());
+        newPasswordField.clear(); confirmPasswordField.clear();
     }
 
-    private void onSaveUsername() {
+    private void handleSaveUsername() {
+        if (!Session.isLoggedIn() || userDAO == null) return;
+        String newName = usernameField.getText();
+        userDAO.updateUsername(Session.getCurrentUser().getId(), newName);
+        Session.getCurrentUser().setUsername(newName);
+        msg.setStyle("-fx-text-fill:#2c7;"); msg.setText("Username updated.");
+    }
+
+    private void handleChangePassword() {
+        if (!Session.isLoggedIn() || userDAO == null) return;
+        String p1 = newPasswordField.getText(), p2 = confirmPasswordField.getText();
+        if (p1==null || !p1.equals(p2)) { msg.setStyle("-fx-text-fill:#d33;"); msg.setText("Passwords do not match."); return; }
         try {
-            User u = Session.get().currentUser();
-            if (u == null) return;
-            String newName = usernameField.getText();
-            if (newName == null || newName.isBlank()) return;
-            if (dao.updateUsername(u.getId(), newName)) {
-                u.setUsername(newName);
-            }
-        } catch (Exception ex) {
-            // Keep UI simple; errors can be surfaced via alerts if needed
+            userDAO.changePassword(Session.getCurrentUser().getId(), p1);
+            msg.setStyle("-fx-text-fill:#2c7;"); msg.setText("Password changed.");
+            newPasswordField.clear(); confirmPasswordField.clear();
+        } catch (IllegalArgumentException ex) {
+            msg.setStyle("-fx-text-fill:#d33;"); msg.setText(ex.getMessage());
         }
     }
 }
